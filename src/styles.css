@@ -1487,6 +1487,15 @@ button {
   font-size: 12px;
 }
 
+.care-chart thead th > span {
+  display: block;
+  overflow: hidden;
+  font-size: 13px;
+  font-weight: 850;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
 .care-chart .row-head,
 .care-chart .row-label {
   position: sticky;

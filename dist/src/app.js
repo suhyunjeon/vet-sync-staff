@@ -3,7 +3,13 @@ const CLIENT_ID_KEY = "vetcrew-staff-client-id";
 const TUTORIAL_SEEN_KEY = "vetcrew-staff-tutorial-seen";
 const now = new Date();
 const currentHour = now.getHours();
+const currentMinute = now.getMinutes();
 const DEFAULT_DATE_KEY = "2026-09-03";
+const chartIntervalOptions = [
+  [60, "1시간"],
+  [30, "30분"],
+  [15, "15분"]
+];
 
 const rows = [
   { id: "weight", label: "체중", tone: "vital", quick: true, placeholder: "예: 5.5kg" },
@@ -331,6 +337,7 @@ document.addEventListener("click", (event) => {
   if (action.dataset.action === "toggle-order-form") {
     if (!canManageClinical()) return;
     state.orderFormOpen = !state.orderFormOpen;
+    state.orderDraftPatientId = state.patientId;
     state.orderSaveNotice = "";
     save();
     render();
@@ -342,6 +349,7 @@ document.addEventListener("click", (event) => {
     if (!canManageClinical()) return;
     state.section = "tasks";
     state.orderFormOpen = true;
+    state.orderDraftPatientId = state.patientId;
     state.orderSaveNotice = "";
     save();
     render();
@@ -722,6 +730,26 @@ document.addEventListener("change", (event) => {
     render();
   }
 
+  if (event.target.matches("[name='patientChartInterval']")) {
+    const patientId = event.target.dataset.patientId;
+    if (!patientId || !canManageClinical()) return;
+    const interval = chartIntervalForValue(event.target.value);
+    const nextPatient = patients.find((patient) => patient.id === patientId);
+    if (!nextPatient) return;
+    patients = mergePatients(patients, [{ ...nextPatient, chartInterval: interval }]);
+    state.patientSaveNotice = `차팅 간격을 ${chartIntervalLabel(interval)}로 변경했습니다.`;
+    save();
+    syncPatient(patients.find((patient) => patient.id === patientId));
+    render();
+  }
+
+  if (event.target.matches("[name='orderPatientId']")) {
+    state.orderDraftPatientId = event.target.value;
+    save();
+    render();
+    requestAnimationFrame(() => document.querySelector("[name='orderTitle']")?.focus());
+  }
+
   if (event.target.matches("[data-calc-field]")) {
     state[event.target.name] = event.target.value;
     save();
@@ -822,7 +850,7 @@ document.addEventListener("submit", (event) => {
     }
     state.orders = mergeOrders(state.orders || [], [result.order]);
     state.orderFormOpen = false;
-    state.orderSaveNotice = `${result.order.hour}시 ${result.order.title} 오더 생성`;
+    state.orderSaveNotice = `${formatTimeLabel(result.order.hour)} ${result.order.title} 오더 생성`;
     save();
     syncOrder(result.order);
     render();
@@ -878,7 +906,7 @@ document.addEventListener("submit", (event) => {
   state.patientId = next.patientId;
   state.rowId = next.rowId;
   state.hour = next.hour;
-  state.entrySaveNotice = `${rowLabel(next.rowId)} · ${next.hour}시 기록 저장`;
+  state.entrySaveNotice = `${rowLabel(next.rowId)} · ${formatTimeLabel(next.hour)} 기록 저장`;
   state.quickOpen = false;
   if (form.classList.contains("quick-panel")) {
     openChartDetail(next.patientId, { replace: true });
@@ -925,6 +953,7 @@ function defaultState() {
     patientEditOpen: false,
     patientSaveNotice: "",
     orderFormOpen: false,
+    orderDraftPatientId: "",
     orderSaveNotice: "",
     orders: [],
     orderStatuses: {},
@@ -977,6 +1006,7 @@ function loadState() {
       calendarMonth: normalizeMonthKey(saved?.calendarMonth || saved?.chartDate || DEFAULT_DATE_KEY),
       patientSaveNotice: "",
       orderFormOpen: false,
+      orderDraftPatientId: "",
       orderSaveNotice: "",
       wardLocations: Array.isArray(saved?.wardLocations) ? saved.wardLocations : defaultWardLocations,
       patientWards: saved?.patientWards && typeof saved.patientWards === "object" ? saved.patientWards : {},
@@ -1237,6 +1267,7 @@ function normalizePatient(patient) {
   const admitDay = Number(patient.admitDay) || calculateAdmitDay(admitDate);
   const ward = patient.ward || wardLocations()[0] || "-";
   const importance = patient.importance || "normal";
+  const chartInterval = chartIntervalForValue(patient.chartInterval, importance);
   return {
     ...patient,
     guardian: patient.guardian || "-",
@@ -1254,6 +1285,7 @@ function normalizePatient(patient) {
     status,
     defaultStatus: status,
     importance,
+    chartInterval,
     room: patient.room || "-",
     date: normalizeDisplayDate(patient.date || admitDate),
     admitDate,
@@ -1654,6 +1686,12 @@ function renderPatientRegisterForm() {
             <option value="high">중요</option>
           </select>
         </label>
+        <label>
+          <span>차팅 간격</span>
+          <select name="newChartInterval">
+            ${chartIntervalOptions.map(([value, label]) => `<option value="${value}">${label}</option>`).join("")}
+          </select>
+        </label>
         <label class="patient-register-wide">
           <span>CC</span>
           <textarea name="newCc" placeholder="주호소 또는 입원 목적"></textarea>
@@ -1873,6 +1911,14 @@ function renderPatientHeader(patient) {
             ${wardLocations().map((ward) => `<option value="${ward}" ${patient.ward === ward ? "selected" : ""}>${ward}</option>`).join("")}
           </select>
         </label>
+        <label class="ward-select">
+          <span>차팅 간격</span>
+          <select name="patientChartInterval" data-patient-id="${patient.id}" ${canManageClinical() ? "" : "disabled"}>
+            ${chartIntervalOptions
+              .map(([value, label]) => `<option value="${value}" ${chartIntervalForPatient(patient) === value ? "selected" : ""}>${label}</option>`)
+              .join("")}
+          </select>
+        </label>
       </div>
     </div>
     ${state.patientEditOpen ? renderPatientEditForm(patient) : ""}
@@ -1905,7 +1951,7 @@ function renderVitalTrendPanel(patient) {
             (point) => `
               <div>
                 <span style="--bar-height: ${point.percent}%"></span>
-                <small>${point.hour}시</small>
+                <small>${formatTimeLabel(point.hour)}</small>
               </div>
             `
           )
@@ -2005,6 +2051,14 @@ function renderPatientEditForm(patient) {
             <option value="high" ${patient.importance === "high" ? "selected" : ""}>중요</option>
           </select>
         </label>
+        <label>
+          <span>차팅 간격</span>
+          <select name="editChartInterval">
+            ${chartIntervalOptions
+              .map(([value, label]) => `<option value="${value}" ${chartIntervalForPatient(patient) === value ? "selected" : ""}>${label}</option>`)
+              .join("")}
+          </select>
+        </label>
         <label class="patient-register-wide">
           <span>CC</span>
           <textarea name="editCc">${patient.cc || ""}</textarea>
@@ -2041,6 +2095,8 @@ function renderChartMode(patient) {
 function renderChart(patient) {
   const entries = entriesFor(patient.id);
   const labelSize = getLabelSize();
+  const chartHours = hours(patient);
+  const current = currentTimeSlot(chartIntervalForPatient(patient));
   return `
     <div class="chart-wrap" style="--label-width: ${labelSize.width}px; --cell-width: ${labelSize.cellWidth}px">
       <table class="care-chart">
@@ -2048,14 +2104,14 @@ function renderChart(patient) {
           <tr>
             <th class="row-head">
               <div class="label-tools">
-                <button class="label-now" type="button" data-action="select-cell" data-patient-id="${patient.id}" data-row-id="${state.rowId}" data-hour="${currentHour}">현재</button>
+                <button class="label-now" type="button" data-action="select-cell" data-patient-id="${patient.id}" data-row-id="${state.rowId}" data-hour="${current}">현재</button>
                 <button class="label-step" type="button" data-action="resize-label" data-delta="-1" aria-label="항목 영역 작게">‹</button>
                 <span>${labelSize.label}</span>
                 <button class="label-step" type="button" data-action="resize-label" data-delta="1" aria-label="항목 영역 크게">›</button>
               </div>
               <button class="label-resize-handle" type="button" data-resize="label-width" aria-label="항목 영역 폭 조절"></button>
             </th>
-            ${hours().map((hour) => `<th class="${hour === currentHour ? "now" : ""}"><small>${hour === 0 ? "AM" : hour === 12 ? "PM" : ""}</small>${hour || 12}</th>`).join("")}
+            ${chartHours.map((hour) => `<th class="${hour === current ? "now" : ""}">${renderTimeHead(hour)}</th>`).join("")}
           </tr>
         </thead>
         <tbody>
@@ -2063,14 +2119,14 @@ function renderChart(patient) {
             .map(
               (row) => `
                 <tr>
-                  <th class="row-label ${row.tone}" ${measureModeForRow(row.id) ? `data-measure-row="${row.id}" data-patient-id="${patient.id}" data-hour="${currentHour}"` : ""}>${row.label}</th>
-                  ${hours()
+                  <th class="row-label ${row.tone}" ${measureModeForRow(row.id) ? `data-measure-row="${row.id}" data-patient-id="${patient.id}" data-hour="${current}"` : ""}>${row.label}</th>
+                  ${chartHours
                     .map((hour) => {
                       const item = entries.find((entryItem) => entryItem.rowId === row.id && entryItem.hour === hour);
                       const selected = patient.id === state.patientId && row.id === state.rowId && hour === state.hour;
                       return `
-                        <td class="${hour === currentHour ? "now" : ""}">
-                          <button class="cell ${item ? "filled" : ""} ${selected ? "selected" : ""}" data-action="select-cell" data-patient-id="${patient.id}" data-row-id="${row.id}" data-hour="${hour}" ${measureModeForRow(row.id) ? `data-measure-row="${row.id}"` : ""} aria-label="${row.label} ${hour}시">
+                        <td class="${hour === current ? "now" : ""}">
+                          <button class="cell ${item ? "filled" : ""} ${selected ? "selected" : ""}" data-action="select-cell" data-patient-id="${patient.id}" data-row-id="${row.id}" data-hour="${hour}" ${measureModeForRow(row.id) ? `data-measure-row="${row.id}"` : ""} aria-label="${row.label} ${formatTimeLabel(hour)}">
                             ${item ? `<strong>${item.value}</strong><small>${item.staff}</small>` : ""}
                           </button>
                         </td>
@@ -2097,7 +2153,7 @@ function renderQuickInput(patient) {
       <div class="quick-head">
         <div>
           <strong>차트 바로 등록</strong>
-          <span>${row.label} · ${state.hour}시 · 셀 길게 눌러 열기</span>
+              <span>${row.label} · ${formatTimeLabel(state.hour)} · 셀 길게 눌러 열기</span>
         </div>
         <div class="quick-head-actions">
           <button type="button" data-action="clear-cell">초기화</button>
@@ -2112,7 +2168,7 @@ function renderQuickInput(patient) {
         </label>
         <label>
           <span>시간</span>
-          <select name="hour">${hours().map((hour) => `<option value="${hour}" ${hour === state.hour ? "selected" : ""}>${hour}시</option>`).join("")}</select>
+          <select name="hour">${hours(patient).map((hour) => `<option value="${hour}" ${hour === state.hour ? "selected" : ""}>${formatTimeLabel(hour)}</option>`).join("")}</select>
         </label>
         <label>
           <span>결과</span>
@@ -2140,7 +2196,7 @@ function renderQuickLauncher(patient) {
   return `
     <aside class="quick-launcher" style="--quick-launcher-width: ${size.launcherWidth}px">
       <span>선택 위치</span>
-      <strong>${row.label} · ${state.hour}시</strong>
+      <strong>${row.label} · ${formatTimeLabel(state.hour)}</strong>
       <div class="quick-launcher-controls" aria-label="빠른입력 메뉴 크기">
         <button type="button" data-action="resize-quick" data-delta="-1" aria-label="빠른입력 작게">‹</button>
         <small>${size.label}</small>
@@ -2167,7 +2223,7 @@ function renderTaskCards(patient) {
               <p>${patient.name} (${patient.guardian})</p>
               <small>${patient.species} / ${patient.breed} / ${patient.age}</small>
               <em>${count ? `${count}회 기록` : "미기록"}</em>
-              <button data-action="select-cell" data-patient-id="${patient.id}" data-row-id="${row.id}" data-hour="${currentHour}">진행하기 ›</button>
+              <button data-action="select-cell" data-patient-id="${patient.id}" data-row-id="${row.id}" data-hour="${currentTimeSlot(chartIntervalForPatient(patient))}">진행하기 ›</button>
             </article>
           `;
         })
@@ -2253,6 +2309,8 @@ function renderWorkCard(task) {
 }
 
 function renderOrderComposer(patient) {
+  const orderPatient = patients.find((item) => item.id === (state.orderDraftPatientId || patient.id)) || patient;
+  const orderCurrent = currentTimeSlot(chartIntervalForPatient(orderPatient));
   return `
     <section class="order-composer" aria-label="오더 생성">
       <header>
@@ -2270,13 +2328,13 @@ function renderOrderComposer(patient) {
               <label>
                 <span>환자</span>
                 <select name="orderPatientId">
-                  ${activePatientsList().map((item) => `<option value="${item.id}" ${item.id === patient.id ? "selected" : ""}>#${item.chartNo} ${item.name}</option>`).join("")}
+                  ${activePatientsList().map((item) => `<option value="${item.id}" ${item.id === orderPatient.id ? "selected" : ""}>#${item.chartNo} ${item.name}</option>`).join("")}
                 </select>
               </label>
               <label>
                 <span>시간</span>
                 <select name="orderHour">
-                  ${hours().map((hour) => `<option value="${hour}" ${hour === currentHour ? "selected" : ""}>${hour}시</option>`).join("")}
+                  ${hours(orderPatient).map((hour) => `<option value="${hour}" ${hour === orderCurrent ? "selected" : ""}>${formatTimeLabel(hour)}</option>`).join("")}
                 </select>
               </label>
               <label>
@@ -2336,7 +2394,7 @@ function renderOrderTaskCard(task) {
     <article class="work-card order-task ${status.done ? "done" : ""}">
       <div>
         <strong>${task.title}</strong>
-        <span>#${task.patient.chartNo} · ${task.hour}시</span>
+        <span>#${task.patient.chartNo} · ${formatTimeLabel(task.hour)}</span>
         <h2>${task.patient.name} (${task.patient.guardian})</h2>
         <p>${task.row.label} · 지정: ${task.assignee}</p>
         ${task.note ? `<p>${task.note}</p>` : ""}
@@ -2370,7 +2428,7 @@ function renderQuickScreen(patient) {
           <button class="${state.bpmMode === "resp" ? "active" : ""}" data-action="set-bpm-mode" data-value="resp">호흡수</button>
           <button data-action="reset-bpm">초기화</button>
         </div>
-        ${state.bpmReturn ? `<div class="bpm-target">#${patient.chartNo} ${patient.name} · ${modeLabel} · ${state.bpmReturn.hour}시 자동입력</div>` : ""}
+        ${state.bpmReturn ? `<div class="bpm-target">#${patient.chartNo} ${patient.name} · ${modeLabel} · ${formatTimeLabel(state.bpmReturn.hour)} 자동입력</div>` : ""}
         <button class="bpm-pad ${measure.active ? "measuring" : ""} ${measure.result !== null ? "done" : ""}" type="button" data-action="tap-bpm">
           <strong>${measure.result !== null ? `${measure.result}` : modeUnit}</strong>
           <span>${bpmPadLabel(measure, modeLabel)}</span>
@@ -2387,7 +2445,7 @@ function renderQuickScreen(patient) {
       <form class="quick-entry-card" data-form="entry">
         <input type="hidden" name="patientId" value="${patient.id}" />
         <input type="hidden" name="rowId" value="${row.id}" />
-        <input type="hidden" name="hour" value="${currentHour}" />
+        <input type="hidden" name="hour" value="${currentTimeSlot(chartIntervalForPatient(patient))}" />
         <div class="quick-search">
           <span>▣</span>
           <textarea name="value" placeholder="결과/완료/메모 입력" autocomplete="off" required></textarea>
@@ -2843,6 +2901,7 @@ function buildPatientFromForm(data, existingPatient = null) {
   const admitDay = calculateAdmitDay(admitDate);
   const ward = read("Ward") || wardLocations()[0] || "-";
   const importance = read("Importance") || "normal";
+  const chartInterval = chartIntervalForValue(read("ChartInterval"), importance);
   const patient = normalizePatient({
     ...(existingPatient || {}),
     id: existingPatient?.id || `p_${Date.now()}_${Math.random().toString(16).slice(2, 8)}`,
@@ -2861,6 +2920,7 @@ function buildPatientFromForm(data, existingPatient = null) {
     doctor,
     status: existingPatient?.status || "current",
     importance,
+    chartInterval,
     room: "-",
     date: admitDate,
     admitDate,
@@ -3026,7 +3086,7 @@ function orderTaskItems() {
         row,
         hour,
         done: status.done,
-        status: status.done ? "done" : hour < currentHour ? "delayed" : hour === currentHour ? "current" : "planned",
+        status: status.done ? "done" : hour < currentTimeValue() ? "delayed" : hour === currentTimeSlot(chartIntervalForPatient(patient)) ? "current" : "planned",
         assignee: order.assignee || "수의사"
       };
     });
@@ -3226,7 +3286,8 @@ function periodLabel(hour) {
 }
 
 function hour12(hour) {
-  return hour % 12 || 12;
+  const wholeHour = Math.floor(Number(hour) || 0);
+  return wholeHour % 12 || 12;
 }
 
 function entriesFor(patientId) {
@@ -3394,6 +3455,47 @@ function getLabelSize(forcedValue) {
   };
 }
 
-function hours() {
-  return Array.from({ length: 24 }, (_, index) => index);
+function chartIntervalForValue(value, importance = "normal") {
+  const interval = Number(value);
+  if ([15, 30, 60].includes(interval)) return interval;
+  return importance === "high" ? 30 : 60;
+}
+
+function chartIntervalForPatient(patient) {
+  return chartIntervalForValue(patient?.chartInterval, patient?.importance);
+}
+
+function chartIntervalLabel(interval) {
+  if (interval === 60) return "1시간으로";
+  return `${interval}분으로`;
+}
+
+function currentTimeValue() {
+  return currentHour + currentMinute / 60;
+}
+
+function currentTimeSlot(interval = 60) {
+  const slotsPerHour = 60 / chartIntervalForValue(interval);
+  return Math.floor(currentTimeValue() * slotsPerHour) / slotsPerHour;
+}
+
+function formatTimeLabel(hour) {
+  const value = Number(hour) || 0;
+  const wholeHour = Math.floor(value);
+  const minutes = Math.round((value - wholeHour) * 60);
+  return `${String(wholeHour).padStart(2, "0")}:${String(minutes).padStart(2, "0")}`;
+}
+
+function renderTimeHead(hour) {
+  const value = Number(hour) || 0;
+  const wholeHour = Math.floor(value);
+  const minutes = Math.round((value - wholeHour) * 60);
+  const period = minutes === 0 && (wholeHour === 0 || wholeHour === 12) ? `<small>${wholeHour === 0 ? "AM" : "PM"}</small>` : "<small></small>";
+  return `${period}<span>${minutes === 0 ? wholeHour || 12 : `:${String(minutes).padStart(2, "0")}`}</span>`;
+}
+
+function hours(patient = activePatient()) {
+  const interval = chartIntervalForPatient(patient);
+  const slotCount = 24 * (60 / interval);
+  return Array.from({ length: slotCount }, (_, index) => (index * interval) / 60);
 }
