@@ -235,7 +235,8 @@ button {
 }
 
 .icon-button,
-.plain-icon {
+.plain-icon,
+.header-spacer {
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -251,6 +252,10 @@ button {
 .icon-button {
   background: #ffffff;
   box-shadow: 0 4px 18px rgba(32, 51, 49, 0.06);
+}
+
+.header-spacer {
+  flex: 0 0 40px;
 }
 
 .date-switcher {
@@ -3345,7 +3350,8 @@ button {
   }
 
   .icon-button,
-  .plain-icon {
+  .plain-icon,
+  .header-spacer {
     width: 34px;
     height: 34px;
     font-size: 22px;

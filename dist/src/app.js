@@ -211,13 +211,6 @@ document.addEventListener("click", (event) => {
     return;
   }
 
-  if (action.dataset.action === "open-menu") {
-    setSection("more");
-    save();
-    render();
-    return;
-  }
-
   if (action.dataset.action === "focus-search") {
     if (state.section !== "chart" || state.chartDetailOpen) {
       state.section = "chart";
@@ -1449,7 +1442,7 @@ function renderApp() {
         ${
           isChartDetail
             ? `<button class="icon-button" data-action="chart-back" aria-label="환자 목록으로 돌아가기">‹</button>`
-            : `<button class="icon-button" data-action="open-menu" aria-label="메뉴">☰</button>`
+            : `<span class="header-spacer" aria-hidden="true"></span>`
         }
         <div class="date-switcher">
           <button class="plain-icon" data-action="shift-date" data-delta="-1" aria-label="전날">‹</button>
