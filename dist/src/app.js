@@ -135,6 +135,29 @@ const navItems = [
   ["more", "⋯", "더보기"]
 ];
 
+const helpSteps = [
+  {
+    section: "chart",
+    title: "차트",
+    text: "환자 목록에서 입원 환자를 찾고, 상세 차트에서 시간대별 기록을 남깁니다."
+  },
+  {
+    section: "tasks",
+    title: "업무",
+    text: "현재 할 일, 지연 업무, 오더, 인수인계 노트를 한 화면에서 확인합니다."
+  },
+  {
+    section: "ward",
+    title: "입원실현황",
+    text: "입원장 위치별 환자 배정과 빈 자리를 빠르게 확인합니다."
+  },
+  {
+    section: "more",
+    title: "더보기",
+    text: "권한 전환, 입원장 설정, 데모 데이터 초기화 같은 관리 기능이 있습니다."
+  }
+];
+
 const realtimeUsers = [
   { name: "데모수의사A", role: "수의사", section: "차트" },
   { name: "데모수의사B", role: "수의사", section: "입원실" },
@@ -230,7 +253,41 @@ document.addEventListener("click", (event) => {
   }
 
   if (action.dataset.action === "set-section") {
+    state.helpOpen = false;
     setSection(action.dataset.value);
+    save();
+    render();
+    return;
+  }
+
+  if (action.dataset.action === "start-help") {
+    state.helpOpen = true;
+    state.helpStep = 0;
+    setSection(helpSteps[0].section);
+    save();
+    render();
+    return;
+  }
+
+  if (action.dataset.action === "next-help") {
+    const nextStep = Number(state.helpStep || 0) + 1;
+    if (nextStep >= helpSteps.length) {
+      state.helpOpen = false;
+      state.helpStep = 0;
+      localStorage.setItem(TUTORIAL_SEEN_KEY, "1");
+    } else {
+      state.helpStep = nextStep;
+      setSection(helpSteps[nextStep].section);
+    }
+    save();
+    render();
+    return;
+  }
+
+  if (action.dataset.action === "close-help") {
+    state.helpOpen = false;
+    state.helpStep = 0;
+    localStorage.setItem(TUTORIAL_SEEN_KEY, "1");
     save();
     render();
     return;
@@ -967,13 +1024,15 @@ function defaultState() {
     labelSize: 2,
     labelWidth: 138,
     search: "",
+    helpOpen: localStorage.getItem(TUTORIAL_SEEN_KEY) !== "1",
+    helpStep: 0,
     calendarOpen: false,
     calendarMonth: DEFAULT_DATE_KEY.slice(0, 7),
     bpmMode: "pulse",
     bpmMeasure: null,
     realtimeUsers,
     entrySaveNotice: "",
-    showTutorial: localStorage.getItem(TUTORIAL_SEEN_KEY) !== "1",
+    showTutorial: false,
     entries: seedEntries
   };
 }
@@ -995,6 +1054,8 @@ function loadState() {
       dischargeNotice: "",
       patientFormOpen: false,
       patientEditOpen: false,
+      helpOpen: localStorage.getItem(TUTORIAL_SEEN_KEY) !== "1" && saved?.helpOpen !== false,
+      helpStep: Number(saved?.helpStep || 0),
       calendarOpen: false,
       calendarMonth: normalizeMonthKey(saved?.calendarMonth || saved?.chartDate || DEFAULT_DATE_KEY),
       patientSaveNotice: "",
@@ -1004,7 +1065,7 @@ function loadState() {
       wardLocations: Array.isArray(saved?.wardLocations) ? saved.wardLocations : defaultWardLocations,
       patientWards: saved?.patientWards && typeof saved.patientWards === "object" ? saved.patientWards : {},
       patientStatuses: saved?.patientStatuses && typeof saved.patientStatuses === "object" ? saved.patientStatuses : {},
-      showTutorial: localStorage.getItem(TUTORIAL_SEEN_KEY) !== "1" && saved?.showTutorial !== false,
+      showTutorial: false,
       realtimeUsers: Array.isArray(saved?.realtimeUsers) ? saved.realtimeUsers : realtimeUsers,
       orders: Array.isArray(saved?.orders) ? saved.orders : [],
       orderStatuses: saved?.orderStatuses && typeof saved.orderStatuses === "object" ? saved.orderStatuses : {},
@@ -1380,7 +1441,7 @@ function closeChartRoute() {
 
 function render() {
   app.innerHTML = state.authed
-    ? `${renderApp()}${state.calendarOpen ? renderCalendarSheet() : ""}${state.showTutorial ? renderTutorialModal() : ""}`
+    ? `${renderApp()}${state.calendarOpen ? renderCalendarSheet() : ""}${state.helpOpen ? renderHelpBubble() : ""}`
     : renderLogin();
   syncBpmTicker();
   syncRealtimeConnection();
@@ -1463,7 +1524,7 @@ function renderApp() {
         ${navItems
           .map(
             ([id, icon, label]) => `
-              <button class="${id === section ? "active" : ""}" data-action="set-section" data-value="${id}">
+              <button class="${id === section ? "active" : ""} ${currentHelpStep()?.section === id ? "help-target" : ""}" data-action="set-section" data-value="${id}">
                 <span>${icon}</span>
                 <small>${label}</small>
                 ${id === "tasks" ? `<em>${taskSummary().todo}</em>` : ""}
@@ -1471,8 +1532,36 @@ function renderApp() {
             `
           )
           .join("")}
+        <button class="help-nav-button" data-action="start-help" aria-label="도움말">
+          <span>?</span>
+          <small>도움말</small>
+        </button>
       </nav>
     </main>
+  `;
+}
+
+function currentHelpStep() {
+  if (!state.helpOpen) return null;
+  return helpSteps[Math.min(Math.max(Number(state.helpStep || 0), 0), helpSteps.length - 1)];
+}
+
+function renderHelpBubble() {
+  const step = currentHelpStep();
+  if (!step) return "";
+  const index = helpSteps.indexOf(step);
+  const isLast = index === helpSteps.length - 1;
+  return `
+    <div class="help-scrim" data-action="close-help" aria-hidden="true"></div>
+    <aside class="help-bubble help-${step.section}" role="dialog" aria-live="polite" aria-label="${step.title} 도움말">
+      <span>${index + 1}/${helpSteps.length}</span>
+      <strong>${step.title}</strong>
+      <p>${step.text}</p>
+      <div>
+        <button type="button" data-action="close-help">닫기</button>
+        <button type="button" data-action="next-help">${isLast ? "완료" : "다음"}</button>
+      </div>
+    </aside>
   `;
 }
 
