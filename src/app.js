@@ -40,6 +40,7 @@ const seedPatients = [
     chartNo: "1001",
     name: "샘플A",
     guardian: "보호자A",
+    photoUrl: "",
     species: "개",
     breed: "포메라니안",
     age: "14년 8개월",
@@ -63,6 +64,7 @@ const seedPatients = [
     chartNo: "1002",
     name: "샘플B",
     guardian: "보호자B",
+    photoUrl: "",
     species: "고양이",
     breed: "MIX",
     age: "15년 8개월",
@@ -86,6 +88,7 @@ const seedPatients = [
     chartNo: "1003",
     name: "샘플C",
     guardian: "보호자C",
+    photoUrl: "",
     species: "고양이",
     breed: "MIX",
     age: "7년 11개월",
@@ -1329,6 +1332,7 @@ function normalizePatient(patient) {
   return {
     ...patient,
     guardian: patient.guardian || "-",
+    photoUrl: patient.photoUrl || "",
     species: patient.species || "기타",
     breed: patient.breed || "-",
     age: patient.age || "-",
@@ -1720,6 +1724,10 @@ function renderPatientRegisterForm() {
           <span>보호자</span>
           <input name="newGuardian" autocomplete="off" />
         </label>
+        <label class="patient-register-wide">
+          <span>프로필 사진 URL</span>
+          <input name="newPhotoUrl" type="url" placeholder="https://..." autocomplete="off" />
+        </label>
         <label>
           <span>종</span>
           <select name="newSpecies">
@@ -1951,6 +1959,7 @@ function renderPatientCard(patient) {
   return `
     <article class="patient-card ${active ? "active" : ""} ${patient.status === "discharged" ? "discharged" : ""}">
       <button data-action="select-patient" data-id="${patient.id}">
+        ${renderPatientAvatar(patient, "card")}
         <div>
           <span class="chart-no">#${patient.chartNo}</span>
           <h2>${patient.name} <em>(${patient.guardian})</em></h2>
@@ -1968,10 +1977,36 @@ function renderPatientCard(patient) {
   `;
 }
 
+function renderPatientAvatar(patient, variant = "card") {
+  const url = String(patient.photoUrl || "").trim();
+  const defaultUrl = defaultPatientPhotoUrl(patient);
+  const imageUrl = url || defaultUrl;
+  const fallback = patient.species === "개" ? "Dog" : patient.species === "고양이" ? "Cat" : "Pet";
+  const onError = url && defaultUrl
+    ? `this.onerror=null;this.src='${escapeAttr(defaultUrl)}'`
+    : "this.closest('.patient-avatar').classList.add('image-failed')";
+  const image = imageUrl
+    ? `<img src="${escapeAttr(imageUrl)}" alt="${escapeAttr(patient.name)} 프로필 사진" loading="lazy" onerror="${onError}" />`
+    : "";
+  return `
+    <span class="patient-avatar avatar-${variant} ${imageUrl ? "has-image" : ""}" aria-hidden="${imageUrl ? "false" : "true"}">
+      ${image}
+      <span>${fallback}</span>
+    </span>
+  `;
+}
+
+function defaultPatientPhotoUrl(patient) {
+  if (patient.species === "개") return "/assets/default-dog.png";
+  if (patient.species === "고양이") return "/assets/default-cat.png";
+  return "";
+}
+
 function renderPatientHeader(patient) {
   const discharged = patient.status === "discharged";
   return `
     <div class="patient-header">
+      ${renderPatientAvatar(patient, "header")}
       <div>
         <div class="title-line">
           <span class="chart-no">#${patient.chartNo}</span>
@@ -2103,6 +2138,10 @@ function renderPatientEditForm(patient) {
         ${patientTextField("editChartNo", "차트번호", patient.chartNo, "numeric")}
         ${patientTextField("editName", "환자명", patient.name)}
         ${patientTextField("editGuardian", "보호자", patient.guardian)}
+        <label class="patient-register-wide">
+          <span>프로필 사진 URL</span>
+          <input name="editPhotoUrl" type="url" value="${escapeAttr(patient.photoUrl || "")}" placeholder="https://..." autocomplete="off" />
+        </label>
         <label>
           <span>종</span>
           <select name="editSpecies">
@@ -2648,7 +2687,7 @@ function renderWardScreen() {
 function renderWardSeatPatient(patient) {
   return `
     <button data-action="select-patient" data-id="${patient.id}">
-      <span class="seat-chart">#${patient.chartNo}</span>
+      ${renderPatientAvatar(patient, "seat")}
       <strong>${patient.name}</strong>
       <small>${patient.doctor}</small>
       <em>${patient.importance === "high" ? "중요" : "보통"} · 입원 ${patient.admitDay}일차</em>
@@ -2832,6 +2871,7 @@ function renderEmptyState(title, text) {
 function renderMiniPatientButton(patient) {
   return `
     <button class="${patient.id === state.patientId ? "active" : ""}" data-action="select-quick-patient" data-id="${patient.id}">
+      ${renderPatientAvatar(patient, "mini")}
       <span>#${patient.chartNo}</span>${patient.name}
     </button>
   `;
@@ -2997,6 +3037,7 @@ function buildPatientFromForm(data, existingPatient = null) {
     chartNo,
     name,
     guardian: read("Guardian") || "-",
+    photoUrl: read("PhotoUrl"),
     species: read("Species") || "기타",
     breed: read("Breed") || "-",
     age: read("Age") || "-",
