@@ -2,13 +2,142 @@
 <html lang="ko">
   <head>
     <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
-    <meta name="theme-color" content="#58c4b8" />
-    <title>VetCrew 입원 차트</title>
-    <link rel="stylesheet" href="/src/styles.css" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="theme-color" content="#1d4ed8" />
+    <title>VetCrew | 입원 차트와 병동 업무를 한 화면에</title>
+    <meta
+      name="description"
+      content="VetCrew는 수의사와 테크니션을 위한 반려동물 입원 차트, 오더, 인수인계, 검사 추이, 보호자 업데이트 관리 웹앱입니다."
+    />
+    <link rel="stylesheet" href="/src/promo.css" />
   </head>
   <body>
-    <div id="app"></div>
-    <script type="module" src="/src/app.js"></script>
+    <header class="site-header">
+      <a class="brand" href="/" aria-label="VetCrew 홈">
+        <span aria-hidden="true"></span>
+        VetCrew
+      </a>
+      <nav aria-label="주요 섹션">
+        <a href="#features">기능</a>
+        <a href="#workflow">흐름</a>
+        <a href="#roles">권한</a>
+      </nav>
+      <a class="header-cta" href="/app.html">데모보기</a>
+    </header>
+
+    <main>
+      <section class="hero">
+        <img src="/assets/hero-vetcrew.png" alt="동물병원 스태프가 입원 환자 차트를 확인하는 모습" />
+        <div class="hero-content">
+          <p>Veterinary Inpatient OS</p>
+          <h1>VetCrew</h1>
+          <strong>입원 차트, 오더, 인수인계를 한 번에.</strong>
+          <span>
+            반려동물 입원 관리에서 가장 자주 놓치는 기록, 처치, 보호자 커뮤니케이션을 수의사와 테크니션이 같은 화면에서 맞춥니다.
+          </span>
+          <div class="hero-actions">
+            <a href="/app.html">데모보기</a>
+            <a href="#features">기능 보기</a>
+          </div>
+        </div>
+      </section>
+
+      <section class="metrics" aria-label="핵심 지표">
+        <article>
+          <strong>24h</strong>
+          <span>시간대별 차트</span>
+        </article>
+        <article>
+          <strong>Zero Miss</strong>
+          <span>누락 업무 추적</span>
+        </article>
+        <article>
+          <strong>Realtime</strong>
+          <span>스태프 동시 확인</span>
+        </article>
+      </section>
+
+      <section class="section" id="features">
+        <div class="section-heading">
+          <span>Chart System</span>
+          <h2>입원 환자 관리에 필요한 기능을 실제 업무 순서대로</h2>
+        </div>
+        <div class="feature-grid">
+          <article>
+            <span>01</span>
+            <h3>환자 등록/수정</h3>
+            <p>차트번호, 보호자, 입원장, 주치의, 입원일, 수술일, CC/DX까지 새 환자 등록과 수정 흐름을 지원합니다.</p>
+          </article>
+          <article>
+            <span>02</span>
+            <h3>오더와 To-do</h3>
+            <p>수의사가 만든 오더를 시간대별 업무로 전환하고, 담당자별 완료/지연 상태를 바로 확인합니다.</p>
+          </article>
+          <article>
+            <span>03</span>
+            <h3>바이탈 그래프</h3>
+            <p>혈압, 체온, 호흡수 같은 반복 기록을 추이로 파악해 변화가 생긴 환자를 빠르게 찾습니다.</p>
+          </article>
+          <article>
+            <span>04</span>
+            <h3>인수인계 노트</h3>
+            <p>교대 전 확인해야 할 핵심 이슈와 미완료 업무를 환자별로 남겨 다음 근무자가 바로 이어받습니다.</p>
+          </article>
+          <article>
+            <span>05</span>
+            <h3>검사 결과/추이</h3>
+            <p>CBC, Chem, 전해질 등 검사 수치를 날짜별로 쌓아 재검과 경과 판단에 필요한 맥락을 보존합니다.</p>
+          </article>
+          <article>
+            <span>06</span>
+            <h3>보호자 업데이트</h3>
+            <p>식욕, 활력, 배변, 검사 결과 안내 여부를 기록해 보호자 커뮤니케이션 누락을 줄입니다.</p>
+          </article>
+        </div>
+      </section>
+
+      <section class="workflow" id="workflow">
+        <div class="section-heading">
+          <span>Daily Flow</span>
+          <h2>아침 회진부터 야간 인수인계까지</h2>
+        </div>
+        <ol>
+          <li>
+            <strong>환자 확인</strong>
+            <p>입원실 현황에서 케이지별 환자와 중요도를 확인합니다.</p>
+          </li>
+          <li>
+            <strong>오더 생성</strong>
+            <p>수의사는 처치, 검사, 투약, 보호자 연락 오더를 업무로 등록합니다.</p>
+          </li>
+          <li>
+            <strong>기록 완료</strong>
+            <p>테크니션은 시간대별 차트와 To-do에서 완료 여부를 남깁니다.</p>
+          </li>
+          <li>
+            <strong>인수인계</strong>
+            <p>미완료 항목과 이상 소견을 다음 근무자에게 남깁니다.</p>
+          </li>
+        </ol>
+      </section>
+
+      <section class="roles" id="roles">
+        <div>
+          <span>For Vets</span>
+          <h2>수의사는 판단과 오더에 집중</h2>
+          <p>환자 정보 수정, 퇴원 처리, 오더 생성, 검사 결과 입력, 보호자 업데이트를 권한 기반으로 관리합니다.</p>
+        </div>
+        <div>
+          <span>For Technicians</span>
+          <h2>테크니션은 수행과 기록에 집중</h2>
+          <p>업무 리스트, 빠른 차트 기록, 완료 체크, 인수인계 노트 중심으로 근무 중 필요한 행동을 줄입니다.</p>
+        </div>
+      </section>
+
+      <section class="cta-band">
+        <h2>입원 환자 흐름을 한 화면에서 맞춰보세요.</h2>
+        <a href="/app.html">데모보기</a>
+      </section>
+    </main>
   </body>
 </html>

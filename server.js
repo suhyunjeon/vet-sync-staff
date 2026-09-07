@@ -42,7 +42,7 @@ function resolveAsset(rawUrl) {
   const filePath = path.join(root, requested);
   if (!filePath.startsWith(root)) return path.join(root, "index.html");
   if (existsSync(filePath) && statSync(filePath).isFile()) return filePath;
-  return path.join(root, "index.html");
+  return path.join(root, pathname.startsWith("/app") ? "app.html" : "index.html");
 }
 
 async function loadEntries() {

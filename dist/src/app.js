@@ -205,6 +205,31 @@ document.addEventListener("click", (event) => {
     return;
   }
 
+  if (action.dataset.action === "open-menu") {
+    setSection("more");
+    save();
+    render();
+    return;
+  }
+
+  if (action.dataset.action === "focus-search") {
+    if (state.section !== "chart" || state.chartDetailOpen) {
+      state.section = "chart";
+      state.chartDetailOpen = false;
+      save();
+      render();
+    }
+    requestAnimationFrame(() => document.querySelector("[name='search']")?.focus());
+    return;
+  }
+
+  if (action.dataset.action === "open-notifications") {
+    setSection("tasks");
+    save();
+    render();
+    return;
+  }
+
   if (action.dataset.action === "set-section") {
     setSection(action.dataset.value);
     save();
@@ -214,7 +239,52 @@ document.addEventListener("click", (event) => {
 
   if (action.dataset.action === "shift-date") {
     state.chartDate = shiftDateKey(selectedDateKey(), Number(action.dataset.delta || 0));
+    state.calendarMonth = monthKeyFromDateKey(state.chartDate);
     state.quickOpen = false;
+    save();
+    render();
+    return;
+  }
+
+  if (action.dataset.action === "toggle-calendar") {
+    state.calendarOpen = !state.calendarOpen;
+    state.calendarMonth = state.calendarMonth || monthKeyFromDateKey(selectedDateKey());
+    save();
+    render();
+    return;
+  }
+
+  if (action.dataset.action === "close-calendar") {
+    state.calendarOpen = false;
+    save();
+    render();
+    return;
+  }
+
+  if (action.dataset.action === "shift-calendar-month") {
+    state.calendarMonth = shiftMonthKey(state.calendarMonth || monthKeyFromDateKey(selectedDateKey()), Number(action.dataset.delta || 0));
+    save();
+    render();
+    return;
+  }
+
+  if (action.dataset.action === "select-calendar-date") {
+    state.chartDate = normalizeDateKey(action.dataset.date);
+    state.calendarMonth = monthKeyFromDateKey(state.chartDate);
+    state.calendarOpen = false;
+    state.quickOpen = false;
+    state.entryPanelOpen = false;
+    save();
+    render();
+    return;
+  }
+
+  if (action.dataset.action === "select-today") {
+    state.chartDate = dateToKey(new Date());
+    state.calendarMonth = monthKeyFromDateKey(state.chartDate);
+    state.calendarOpen = false;
+    state.quickOpen = false;
+    state.entryPanelOpen = false;
     save();
     render();
     return;
@@ -261,6 +331,17 @@ document.addEventListener("click", (event) => {
   if (action.dataset.action === "toggle-order-form") {
     if (!canManageClinical()) return;
     state.orderFormOpen = !state.orderFormOpen;
+    state.orderSaveNotice = "";
+    save();
+    render();
+    requestAnimationFrame(() => document.querySelector("[name='orderTitle']")?.focus());
+    return;
+  }
+
+  if (action.dataset.action === "open-order-settings") {
+    if (!canManageClinical()) return;
+    state.section = "tasks";
+    state.orderFormOpen = true;
     state.orderSaveNotice = "";
     save();
     render();
@@ -534,10 +615,15 @@ document.addEventListener("click", (event) => {
 document.addEventListener("pointerdown", (event) => {
   const cellTarget = event.target.closest("[data-action='select-cell']");
   if (cellTarget) {
+    const measureTarget = cellTarget.matches("[data-measure-row]") ? cellTarget : null;
     longPressTimer = setTimeout(() => {
-      openEntryFromCell(cellTarget);
+      if (measureTarget) {
+        openMeasureFromChart(measureTarget);
+      } else {
+        openEntryFromCell(cellTarget);
+      }
       longPressTimer = null;
-    }, 420);
+    }, measureTarget ? 520 : 420);
   }
 
   const measureTarget = event.target.closest("[data-measure-row]");
@@ -859,6 +945,8 @@ function defaultState() {
     labelSize: 2,
     labelWidth: 138,
     search: "",
+    calendarOpen: false,
+    calendarMonth: DEFAULT_DATE_KEY.slice(0, 7),
     bpmMode: "pulse",
     bpmMeasure: null,
     realtimeUsers,
@@ -885,6 +973,8 @@ function loadState() {
       dischargeNotice: "",
       patientFormOpen: false,
       patientEditOpen: false,
+      calendarOpen: false,
+      calendarMonth: normalizeMonthKey(saved?.calendarMonth || saved?.chartDate || DEFAULT_DATE_KEY),
       patientSaveNotice: "",
       orderFormOpen: false,
       orderSaveNotice: "",
@@ -1264,7 +1354,9 @@ function closeChartRoute() {
 }
 
 function render() {
-  app.innerHTML = state.authed ? `${renderApp()}${state.showTutorial ? renderTutorialModal() : ""}` : renderLogin();
+  app.innerHTML = state.authed
+    ? `${renderApp()}${state.calendarOpen ? renderCalendarSheet() : ""}${state.showTutorial ? renderTutorialModal() : ""}`
+    : renderLogin();
   syncBpmTicker();
   syncRealtimeConnection();
 }
@@ -1325,16 +1417,18 @@ function renderApp() {
         ${
           isChartDetail
             ? `<button class="icon-button" data-action="chart-back" aria-label="환자 목록으로 돌아가기">‹</button>`
-            : `<button class="icon-button" aria-label="메뉴">☰</button>`
+            : `<button class="icon-button" data-action="open-menu" aria-label="메뉴">☰</button>`
         }
         <div class="date-switcher">
           <button class="plain-icon" data-action="shift-date" data-delta="-1" aria-label="전날">‹</button>
-          <strong>${headerDate.monthDay} <span class="${headerDate.weekend ? "weekend" : ""}">(${headerDate.weekday})</span></strong>
+          <button class="date-display" data-action="toggle-calendar" aria-label="날짜 선택">
+            <strong>${headerDate.monthDay} <span class="${headerDate.weekend ? "weekend" : ""}">(${headerDate.weekday})</span></strong>
+          </button>
           <button class="plain-icon" data-action="shift-date" data-delta="1" aria-label="다음날">›</button>
         </div>
         <div class="header-actions">
-          <button class="plain-icon" aria-label="검색">⌕</button>
-          <button class="plain-icon" aria-label="알림">♢</button>
+          <button class="plain-icon" data-action="focus-search" aria-label="검색">⌕</button>
+          <button class="plain-icon" data-action="open-notifications" aria-label="알림">♢</button>
         </div>
       </header>
 
@@ -1357,7 +1451,50 @@ function renderApp() {
   `;
 }
 
+function renderCalendarSheet() {
+  const selectedKey = selectedDateKey();
+  const monthKey = normalizeMonthKey(state.calendarMonth || monthKeyFromDateKey(selectedKey));
+  const monthDate = parseMonthKey(monthKey);
+  const title = `${monthDate.getFullYear()}년 ${monthDate.getMonth() + 1}월`;
+  const weekdays = ["일", "월", "화", "수", "목", "금", "토"];
+  const days = calendarDays(monthKey);
+  return `
+    <div class="calendar-backdrop" data-action="close-calendar" aria-hidden="true"></div>
+    <section class="calendar-sheet" role="dialog" aria-modal="true" aria-label="날짜 선택">
+      <header>
+        <button class="plain-icon" data-action="shift-calendar-month" data-delta="-1" aria-label="이전 달">‹</button>
+        <strong>${title}</strong>
+        <button class="plain-icon" data-action="shift-calendar-month" data-delta="1" aria-label="다음 달">›</button>
+      </header>
+      <div class="calendar-weekdays">
+        ${weekdays.map((day) => `<span>${day}</span>`).join("")}
+      </div>
+      <div class="calendar-grid">
+        ${days
+          .map(
+            (day) => `
+              <button
+                class="${day.inMonth ? "" : "muted"} ${day.key === selectedKey ? "selected" : ""} ${day.today ? "today" : ""}"
+                data-action="select-calendar-date"
+                data-date="${day.key}"
+                type="button"
+              >
+                <span>${day.date.getDate()}</span>
+              </button>
+            `
+          )
+          .join("")}
+      </div>
+      <footer>
+        <button type="button" data-action="select-today">오늘</button>
+        <button type="button" data-action="close-calendar">닫기</button>
+      </footer>
+    </section>
+  `;
+}
+
 function renderSection(section, patient) {
+  if (section === "quick") return renderQuickScreen(patient);
   if (section === "tasks") return renderTasksScreen();
   if (section === "ward") return renderWardScreen();
   if (section === "more") return renderMoreScreen();
@@ -1388,6 +1525,10 @@ function renderChartListScreen(visiblePatients) {
       <div class="chart-list-toolbar">
         <strong>총 ${visiblePatients.length}건</strong>
         <div>
+          <label class="chart-search-field">
+            <span>검색</span>
+            <input name="search" value="${state.search || ""}" placeholder="환자명 / 차트번호" autocomplete="off" />
+          </label>
           <label>
             <span>종</span>
             <select name="chartSpecies">
@@ -2053,7 +2194,7 @@ function renderTasksScreen() {
           <button data-action="scroll-top">맨 위</button>
           <button class="${state.view === "cards" ? "active" : ""}" data-action="set-view" data-value="cards">간단히 보기</button>
           <button class="${state.view !== "cards" ? "active" : ""}" data-action="set-view" data-value="chart">시간대 별</button>
-          <button ${canManageClinical() ? "" : "disabled"}>To do 설정</button>
+          <button data-action="open-order-settings" ${canManageClinical() ? "" : "disabled"}>To do 설정</button>
         </div>
       </div>
       ${canManageClinical() ? "" : `<p class="permission-note">환자 수정, 오더 생성, 검사 입력은 수의사 권한에서만 가능합니다. 테크니션은 기록과 완료 체크를 사용할 수 있습니다.</p>`}
@@ -2221,7 +2362,7 @@ function renderQuickScreen(patient) {
     <section class="quick-page menu-screen">
       <div class="quick-clock">
         <strong>${periodLabel(currentHour)} ${hour12(currentHour)}</strong>
-        <button class="plain-icon" aria-label="알림">♢</button>
+        <button class="plain-icon" data-action="open-notifications" aria-label="알림">♢</button>
       </div>
       <div class="bpm-card">
         <div class="bpm-tabs">
@@ -2333,7 +2474,7 @@ function renderWardScreen() {
                   ${
                     ward.patients.length
                       ? ward.patients.map((patient) => renderWardSeatPatient(patient)).join("")
-                      : `<button class="empty-seat" type="button">배정 대기</button>`
+                      : `<span class="empty-seat">배정 대기</span>`
                   }
                 </div>
               </article>
@@ -3143,6 +3284,47 @@ function dateToKey(date) {
   const month = String(date.getMonth() + 1).padStart(2, "0");
   const day = String(date.getDate()).padStart(2, "0");
   return `${year}-${month}-${day}`;
+}
+
+function monthKeyFromDateKey(dateKey) {
+  return normalizeDateKey(dateKey).slice(0, 7);
+}
+
+function normalizeMonthKey(value) {
+  const match = String(value || "").match(/^(\d{4})[-.](\d{2})(?:[-.]\d{2})?$/);
+  if (!match) return DEFAULT_DATE_KEY.slice(0, 7);
+  return `${match[1]}-${match[2]}`;
+}
+
+function parseMonthKey(value) {
+  const monthKey = normalizeMonthKey(value);
+  const [year, month] = monthKey.split("-").map(Number);
+  return new Date(year, month - 1, 1);
+}
+
+function shiftMonthKey(monthKey, delta) {
+  const date = parseMonthKey(monthKey);
+  date.setMonth(date.getMonth() + delta);
+  return dateToKey(date).slice(0, 7);
+}
+
+function calendarDays(monthKey) {
+  const first = parseMonthKey(monthKey);
+  const cursor = new Date(first);
+  cursor.setDate(1 - first.getDay());
+  const todayKey = dateToKey(new Date());
+  return Array.from({ length: 42 }, () => {
+    const date = new Date(cursor);
+    const key = dateToKey(date);
+    const day = {
+      date,
+      key,
+      inMonth: date.getMonth() === first.getMonth(),
+      today: key === todayKey
+    };
+    cursor.setDate(cursor.getDate() + 1);
+    return day;
+  });
 }
 
 function shiftDateKey(dateKey, delta) {
