@@ -1,0 +1,13 @@
+{
+  "name": "vetcrew-staff",
+  "version": "0.1.0",
+  "private": true,
+  "description": "동물병원 직원용 모바일 입원 차트 웹앱",
+  "type": "module",
+  "scripts": {
+    "dev": "node server.js",
+    "build": "node scripts/build.js",
+    "start": "node server.js"
+  },
+  "license": "UNLICENSED"
+}

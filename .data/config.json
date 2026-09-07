@@ -1,0 +1,11 @@
+{
+  "wardLocations": [
+    "강아지 ICU-1",
+    "고양이 ICU-1",
+    "고양이 ICU-2"
+  ],
+  "patientWards": {},
+  "patientStatuses": {
+    "p7770": "discharged"
+  }
+}
