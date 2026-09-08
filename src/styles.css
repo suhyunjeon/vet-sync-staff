@@ -3375,7 +3375,18 @@ button {
   }
 
   .clinical-panels {
-    grid-template-columns: 1fr;
+    grid-auto-columns: minmax(230px, 82vw);
+    grid-auto-flow: column;
+    grid-template-columns: none;
+    max-height: 210px;
+    overflow-x: auto;
+    overflow-y: hidden;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  .clinical-panel {
+    max-height: 184px;
+    overflow-y: auto;
   }
 
   .chart-mode {
