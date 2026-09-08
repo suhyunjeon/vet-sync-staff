@@ -914,6 +914,11 @@ button {
   grid-column: span 2;
 }
 
+.order-presets {
+  grid-column: 1 / -1;
+  margin: -2px 0 2px;
+}
+
 .order-form .primary-action {
   align-self: end;
   min-height: 42px;
@@ -1750,6 +1755,21 @@ button {
   color: #1e3a8a;
   background: rgba(255, 255, 255, 0.45);
   font-size: 9px;
+}
+
+.cell-order {
+  max-width: 100%;
+  overflow: hidden;
+  border-radius: 4px;
+  padding: 2px 5px;
+  color: #1d4ed8;
+  background: #dbeafe;
+  font-size: 9px;
+  font-style: normal;
+  font-weight: 900;
+  line-height: 1.15;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .scroll-track {
@@ -3285,14 +3305,26 @@ button {
 
 @media (max-width: 720px) and (orientation: portrait) {
   .quick-panel {
-    top: 0;
-    right: auto;
-    bottom: auto;
-    left: 100dvw;
-    width: 100dvh;
-    height: 100dvw;
-    transform: rotate(90deg);
-    transform-origin: top left;
+    inset: 0;
+    width: 100dvw;
+    height: 100dvh;
+    grid-template-columns: 1fr;
+    grid-template-rows: auto auto minmax(0, auto);
+    overflow-x: hidden;
+    overflow-y: auto;
+    transform: none;
+  }
+
+  .quick-fields {
+    grid-column: 1;
+    grid-row: auto;
+  }
+
+  .quick-panel .keypad {
+    grid-column: 1;
+    grid-row: auto;
+    height: auto;
+    grid-auto-rows: minmax(62px, auto);
   }
 
   .menu-screen {

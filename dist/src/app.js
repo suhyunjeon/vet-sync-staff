@@ -395,6 +395,7 @@ document.addEventListener("click", (event) => {
     if (!canManageClinical()) return;
     state.orderFormOpen = !state.orderFormOpen;
     state.orderDraftPatientId = state.patientId;
+    state.orderDraftRowId = state.rowId || state.orderDraftRowId || "diet";
     state.orderSaveNotice = "";
     save();
     render();
@@ -407,6 +408,7 @@ document.addEventListener("click", (event) => {
     state.section = "tasks";
     state.orderFormOpen = true;
     state.orderDraftPatientId = state.patientId;
+    state.orderDraftRowId = state.rowId || state.orderDraftRowId || "diet";
     state.orderSaveNotice = "";
     save();
     render();
@@ -575,6 +577,15 @@ document.addEventListener("click", (event) => {
 
   if (action.dataset.action === "preset-value") {
     const input = document.querySelector("[name='value']");
+    if (!input) return;
+    const value = action.dataset.value || "";
+    input.value = input.value ? `${input.value} / ${value}` : value;
+    input.focus();
+    return;
+  }
+
+  if (action.dataset.action === "order-preset") {
+    const input = document.querySelector("[name='orderTitle']");
     if (!input) return;
     const value = action.dataset.value || "";
     input.value = input.value ? `${input.value} / ${value}` : value;
@@ -807,6 +818,13 @@ document.addEventListener("change", (event) => {
     requestAnimationFrame(() => document.querySelector("[name='orderTitle']")?.focus());
   }
 
+  if (event.target.matches("[name='orderRowId']")) {
+    state.orderDraftRowId = event.target.value;
+    const presets = document.querySelector(".order-presets");
+    if (presets) presets.innerHTML = orderPresetButtons(state.orderDraftRowId);
+    save();
+  }
+
   if (event.target.matches("[data-calc-field]")) {
     state[event.target.name] = event.target.value;
     save();
@@ -1011,6 +1029,7 @@ function defaultState() {
     patientSaveNotice: "",
     orderFormOpen: false,
     orderDraftPatientId: "",
+    orderDraftRowId: "diet",
     orderSaveNotice: "",
     orders: [],
     orderStatuses: {},
@@ -1068,6 +1087,7 @@ function loadState() {
       patientSaveNotice: "",
       orderFormOpen: false,
       orderDraftPatientId: "",
+      orderDraftRowId: saved?.orderDraftRowId || "diet",
       orderSaveNotice: "",
       wardLocations: Array.isArray(saved?.wardLocations) ? saved.wardLocations : defaultWardLocations,
       patientWards: saved?.patientWards && typeof saved.patientWards === "object" ? saved.patientWards : {},
@@ -2054,10 +2074,23 @@ function renderPatientHeader(patient) {
 function renderPatientClinicalPanels(patient) {
   return `
     <section class="clinical-panels" aria-label="환자 임상 기능">
+      ${renderPatientHandoffPanel(patient)}
       ${renderVitalTrendPanel(patient)}
       ${renderGuardianPanel(patient)}
-      ${renderLabPanel(patient)}
     </section>
+  `;
+}
+
+function renderPatientHandoffPanel(patient) {
+  const notes = clinicalRecords("handoff", patient.id);
+  return `
+    <article class="clinical-panel patient-handoff-panel">
+      <header>
+        <span>Handoff</span>
+        <strong>인수인계 노트</strong>
+      </header>
+      ${renderClinicalList(notes, "인수인계 노트 없음")}
+    </article>
   `;
 }
 
@@ -2100,25 +2133,6 @@ function renderGuardianPanel(patient) {
         <button type="submit" ${canManageClinical() ? "" : "disabled"}>기록</button>
       </form>
       ${renderClinicalList(updates, "보호자 업데이트 없음")}
-    </article>
-  `;
-}
-
-function renderLabPanel(patient) {
-  const labs = clinicalRecords("lab", patient.id);
-  return `
-    <article class="clinical-panel">
-      <header>
-        <span>Labs</span>
-        <strong>검사 결과/추이</strong>
-      </header>
-      <form data-form="clinical-record" data-record-type="lab">
-        <input type="hidden" name="patientId" value="${patient.id}" />
-        <input name="testName" placeholder="검사항목" ${canManageClinical() ? "" : "disabled"} required />
-        <input name="value" placeholder="결과" ${canManageClinical() ? "" : "disabled"} required />
-        <button type="submit" ${canManageClinical() ? "" : "disabled"}>추가</button>
-      </form>
-      ${renderClinicalList(labs, "검사 결과 없음")}
     </article>
   `;
 }
@@ -2222,6 +2236,7 @@ function renderChartMode(patient) {
 
 function renderChart(patient) {
   const entries = entriesFor(patient.id);
+  const patientOrders = orderTaskItems().filter((order) => order.patient.id === patient.id);
   const labelSize = getLabelSize();
   const chartHours = hours(patient);
   const current = currentTimeSlot(chartIntervalForPatient(patient));
@@ -2251,11 +2266,13 @@ function renderChart(patient) {
                   ${chartHours
                     .map((hour) => {
                       const item = entries.find((entryItem) => entryItem.rowId === row.id && entryItem.hour === hour);
+                      const cellOrders = patientOrders.filter((order) => order.row.id === row.id && order.hour === hour);
                       const selected = patient.id === state.patientId && row.id === state.rowId && hour === state.hour;
                       return `
                         <td class="${hour === current ? "now" : ""}">
-                          <button class="cell ${item ? "filled" : ""} ${selected ? "selected" : ""}" data-action="select-cell" data-patient-id="${patient.id}" data-row-id="${row.id}" data-hour="${hour}" ${measureModeForRow(row.id) ? `data-measure-row="${row.id}"` : ""} aria-label="${row.label} ${formatTimeLabel(hour)}">
+                          <button class="cell ${item || cellOrders.length ? "filled" : ""} ${selected ? "selected" : ""}" data-action="select-cell" data-patient-id="${patient.id}" data-row-id="${row.id}" data-hour="${hour}" ${measureModeForRow(row.id) ? `data-measure-row="${row.id}"` : ""} aria-label="${row.label} ${formatTimeLabel(hour)}">
                             ${item ? `<strong>${item.value}</strong><small>${item.staff}</small>` : ""}
+                            ${cellOrders.map((order) => `<em class="cell-order">${escapeAttr(order.title)}</em>`).join("")}
                           </button>
                         </td>
                       `;
@@ -2439,6 +2456,7 @@ function renderWorkCard(task) {
 function renderOrderComposer(patient) {
   const orderPatient = patients.find((item) => item.id === (state.orderDraftPatientId || patient.id)) || patient;
   const orderCurrent = currentTimeSlot(chartIntervalForPatient(orderPatient));
+  const orderRowId = rows.find((row) => row.id === state.orderDraftRowId)?.id || "diet";
   return `
     <section class="order-composer" aria-label="오더 생성">
       <header>
@@ -2474,11 +2492,12 @@ function renderOrderComposer(patient) {
                 </select>
               </label>
               <label>
-                <span>분류</span>
+                <span>차트 항목</span>
                 <select name="orderRowId">
-                  ${rows.map((row) => `<option value="${row.id}">${row.label}</option>`).join("")}
+                  ${rows.map((row) => `<option value="${row.id}" ${row.id === orderRowId ? "selected" : ""}>${row.label}</option>`).join("")}
                 </select>
               </label>
+              ${renderOrderPresets(orderRowId)}
               <label class="order-form-wide">
                 <span>오더</span>
                 <input name="orderTitle" placeholder="예: 항생제 IV, 혈압 재측정" autocomplete="off" required />
@@ -2494,6 +2513,21 @@ function renderOrderComposer(patient) {
       }
     </section>
   `;
+}
+
+function renderOrderPresets(rowId) {
+  const presets = presetsForRow(rowId);
+  return `
+    <div class="entry-presets order-presets" aria-label="오더 추천">
+      ${orderPresetButtons(rowId)}
+    </div>
+  `;
+}
+
+function orderPresetButtons(rowId) {
+  return presetsForRow(rowId)
+    .map(([value, label]) => `<button type="button" data-action="order-preset" data-value="${escapeAttr(value)}">${label}</button>`)
+    .join("");
 }
 
 function renderClinicalList(items, emptyText) {
@@ -2611,19 +2645,32 @@ function renderQuickScreen(patient) {
 }
 
 function renderEntryPresets() {
+  const presets = presetsForRow(state.rowId);
   return `
     <div class="entry-presets" aria-label="빠른 기록">
-      ${[
-        ["✓", "완료"],
-        ["특이사항 없음", "특이사항 없음"],
-        ["식욕 없음", "식욕 없음"],
-        ["거부", "거부"],
-        ["보류", "보류"]
-      ]
-        .map(([value, label]) => `<button type="button" data-action="preset-value" data-value="${value}">${label}</button>`)
+      ${presets
+        .map(([value, label]) => `<button type="button" data-action="preset-value" data-value="${escapeAttr(value)}">${label}</button>`)
         .join("")}
     </div>
   `;
+}
+
+function presetsForRow(rowId) {
+  const presetMap = {
+    weight: [["체중 측정", "체중"]],
+    temp: [["정상", "정상"], ["발열", "발열"], ["저체온", "저체온"]],
+    bp: [["혈압 재확인", "재확인"], ["도플러", "도플러"], ["측정 보류", "보류"]],
+    pulse: [["심박수", "심박수"], ["Murmur 없음", "Murmur 없음"], ["부정맥 없음", "부정맥 없음"]],
+    resp: [["P(헐떡임)", "P"], ["SRR(숙면중 호흡수)", "SRR"], ["호흡 안정", "호흡 안정"]],
+    vomit: [["구토 없음", "구토 없음"], ["구토 1회", "구토 1회"], ["거품토", "거품토"], ["사료토", "사료토"]],
+    feces: [["설사", "설사"], ["정상변", "정상변"], ["혈변", "혈변"], ["점액변", "점액변"], ["변비", "변비"]],
+    urine: [["정상뇨", "정상뇨"], ["혈뇨", "혈뇨"], ["점액뇨", "점액뇨"], ["배뇨 없음", "배뇨 없음"]],
+    diet: [["강급", "강급"], ["핸드피딩", "핸드피딩"], ["잘먹음", "잘먹음"], ["식욕감소", "식욕감소"]],
+    water: [["수액 유지", "수액 유지"], ["라인 확인", "라인 확인"], ["용량 재확인", "용량 재확인"]],
+    urinary: [["압박배뇨 완료", "완료"], ["자발배뇨", "자발배뇨"], ["배뇨 없음", "배뇨 없음"]],
+    guardian: [["보호자 연락", "보호자 연락"], ["안내 완료", "안내 완료"], ["오전 연락", "오전 연락"]]
+  };
+  return presetMap[rowId] || [["완료", "완료"], ["특이사항 없음", "특이사항 없음"], ["보류", "보류"], ["거부", "거부"]];
 }
 
 function rowLabel(rowId) {
