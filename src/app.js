@@ -2435,9 +2435,10 @@ function renderQuickInput(patient) {
     <form class="quick-panel ${showKeypad ? "keypad-ready" : "no-keypad"}" data-form="entry" style="--quick-sheet-height: ${size.sheetHeight}vh">
       <input type="hidden" name="patientId" value="${patient.id}" />
       <div class="quick-head">
+        <button class="quick-back-button" type="button" data-action="close-entry" aria-label="차트로 돌아가기">‹ 차트</button>
         <div>
           <strong>차트 바로 등록</strong>
-              <span>${row.label} · ${formatTimeLabel(state.hour)} · 셀 길게 눌러 열기</span>
+          <span>${row.label} · ${formatTimeLabel(state.hour)} · 셀 길게 눌러 열기</span>
         </div>
         <div class="quick-head-actions">
           <button type="button" data-action="clear-cell">초기화</button>
