@@ -1,10 +1,12 @@
+import { seedPatients } from "./seed-patients.js";
+
 const STORAGE_KEY = "vetcrew-staff-state-v1";
 const CLIENT_ID_KEY = "vetcrew-staff-client-id";
 const TUTORIAL_SEEN_KEY = "vetcrew-staff-tutorial-seen";
 const now = new Date();
 const currentHour = now.getHours();
 const currentMinute = now.getMinutes();
-const DEFAULT_DATE_KEY = "2026-09-03";
+const DEFAULT_DATE_KEY = dateToKey(now);
 const chartIntervalOptions = [
   [60, "1시간"],
   [30, "30분"],
@@ -32,81 +34,6 @@ const rows = [
   { id: "urinary", label: "압박배뇨", tone: "care", quick: true, placeholder: "예: ✓" },
   { id: "twitching", label: "**Twitching 확인: Y/N", tone: "check", quick: true, placeholder: "예: N" },
   { id: "guardian", label: "보호자채널전송", tone: "check", quick: true, placeholder: "예: 전송" }
-];
-
-const seedPatients = [
-  {
-    id: "p7770",
-    chartNo: "1001",
-    name: "샘플A",
-    guardian: "보호자A",
-    photoUrl: "",
-    species: "개",
-    breed: "포메라니안",
-    age: "14년 8개월",
-    sex: "중성화수컷",
-    ward: "강아지 ICU-1",
-    admitDay: 2,
-    weight: "5.5kg",
-    cc: "호흡기 모니터링 샘플",
-    dx: "입원 경과 관찰",
-    doctor: "데모수의사A",
-    status: "current",
-    importance: "high",
-    room: "-",
-    date: "2026.09.03",
-    admitDate: "2026.09.02",
-    surgeryDate: "2026.08.28",
-    tags: ["입원 2일차", "강아지 ICU-1", "CPR"]
-  },
-  {
-    id: "p2161",
-    chartNo: "1002",
-    name: "샘플B",
-    guardian: "보호자B",
-    photoUrl: "",
-    species: "고양이",
-    breed: "MIX",
-    age: "15년 8개월",
-    sex: "중성화암컷",
-    ward: "고양이 ICU-1",
-    admitDay: 3,
-    weight: "3.26kg",
-    cc: "식욕 및 활력 확인 샘플",
-    dx: "진단 메모 샘플",
-    doctor: "데모수의사B",
-    status: "current",
-    importance: "normal",
-    room: "-",
-    date: "2026.09.03",
-    admitDate: "2026.09.01",
-    surgeryDate: "",
-    tags: ["입원 3일차", "고양이 ICU-1", "CPR"]
-  },
-  {
-    id: "p5947",
-    chartNo: "1003",
-    name: "샘플C",
-    guardian: "보호자C",
-    photoUrl: "",
-    species: "고양이",
-    breed: "MIX",
-    age: "7년 11개월",
-    sex: "중성화수컷",
-    ward: "고양이 ICU-2",
-    admitDay: 3,
-    weight: "4.8kg",
-    cc: "수술 후 처치 확인 샘플",
-    dx: "수술 후 회복 모니터링",
-    doctor: "데모수의사C",
-    status: "delayed",
-    importance: "high",
-    room: "-",
-    date: "2026.09.03",
-    admitDate: "2026.09.01",
-    surgeryDate: "2026.09.01",
-    tags: ["입원 3일차", "고양이 ICU-2", "CPR"]
-  }
 ];
 
 let patients = [...seedPatients];

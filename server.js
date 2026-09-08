@@ -4,6 +4,7 @@ import { mkdir, readFile, writeFile } from "node:fs/promises";
 import { existsSync, statSync } from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
+import { seedPatients } from "./src/seed-patients.js";
 
 const root = path.dirname(fileURLToPath(import.meta.url));
 const host = "127.0.0.1";
@@ -17,6 +18,7 @@ const orderStatusesFile = path.join(dataDir, "order-statuses.json");
 const clinicalRecordsFile = path.join(dataDir, "clinical-records.json");
 const sseClients = new Map();
 const presence = new Map();
+const defaultDateKey = dateToKey(new Date());
 let entries = await loadEntries();
 let config = await loadConfig();
 let patients = await loadPatients();
@@ -49,7 +51,12 @@ async function loadEntries() {
   try {
     const body = await readFile(entriesFile, "utf8");
     const parsed = JSON.parse(body);
-    return Array.isArray(parsed) ? parsed : [];
+    if (!Array.isArray(parsed)) return [];
+    const refreshed = refreshSeedEntryDates(parsed);
+    if (JSON.stringify(refreshed) !== JSON.stringify(parsed)) {
+      await writeFile(entriesFile, JSON.stringify(refreshed, null, 2));
+    }
+    return refreshed;
   } catch {
     return [];
   }
@@ -73,10 +80,19 @@ async function loadPatients() {
   try {
     const body = await readFile(patientsFile, "utf8");
     const parsed = JSON.parse(body);
-    return Array.isArray(parsed) ? parsed : [];
+    if (Array.isArray(parsed) && parsed.length) {
+      const refreshed = refreshSeedPatientDates(parsed);
+      if (JSON.stringify(refreshed) !== JSON.stringify(parsed)) {
+        await writeFile(patientsFile, JSON.stringify(refreshed, null, 2));
+      }
+      return refreshed;
+    }
   } catch {
-    return [];
+    // Seed demo patients when the local sync store is absent or not initialized yet.
   }
+  await mkdir(dataDir, { recursive: true });
+  await writeFile(patientsFile, JSON.stringify(seedPatients, null, 2));
+  return [...seedPatients];
 }
 
 async function loadOrders() {
@@ -169,7 +185,43 @@ function readJson(req) {
 }
 
 function entryDateKey(entry) {
-  return entry.dateKey || "2026-09-03";
+  return entry.dateKey || defaultDateKey;
+}
+
+function dateToKey(date) {
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, "0");
+  const day = String(date.getDate()).padStart(2, "0");
+  return `${year}-${month}-${day}`;
+}
+
+function refreshSeedPatientDates(patientList) {
+  return patientList.map((patient) => {
+    const seedPatient = seedPatients.find((item) => item.id === patient.id && item.chartNo === patient.chartNo);
+    if (!seedPatient) return patient;
+    return {
+      ...patient,
+      date: seedPatient.date,
+      admitDate: seedPatient.admitDate,
+      surgeryDate: seedPatient.surgeryDate
+    };
+  });
+}
+
+function refreshSeedEntryDates(entryList) {
+  return entryList.map((entry) => {
+    if (!isSeedDemoEntry(entry)) return entry;
+    return { ...entry, dateKey: defaultDateKey };
+  });
+}
+
+function isSeedDemoEntry(entry) {
+  return (
+    entry?.dateKey === "2026-09-03" &&
+    ["p7770", "p2161", "p5947"].includes(entry.patientId) &&
+    typeof entry.id === "string" &&
+    !entry.id.startsWith("e_")
+  );
 }
 
 function sameEntry(a, b) {
