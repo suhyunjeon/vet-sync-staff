@@ -175,6 +175,8 @@ const app = document.querySelector("#app");
 const state = loadState();
 const clientId = loadClientId();
 let chartResize = null;
+let chartPan = null;
+let chartTrackDrag = null;
 let bpmTicker = null;
 let longPressTimer = null;
 let suppressClickUntil = 0;
@@ -708,6 +710,20 @@ document.addEventListener("click", (event) => {
 });
 
 document.addEventListener("pointerdown", (event) => {
+  const chartWrap = event.target.closest(".chart-wrap");
+  if (chartWrap && !event.target.closest("[data-resize='label-width']")) {
+    chartPan = {
+      pointerId: event.pointerId,
+      chart: chartWrap,
+      startX: event.clientX,
+      startY: event.clientY,
+      scrollLeft: chartWrap.scrollLeft,
+      scrollTop: chartWrap.scrollTop,
+      moved: false
+    };
+    chartWrap.setPointerCapture?.(event.pointerId);
+  }
+
   const cellTarget = event.target.closest("[data-action='select-cell']");
   if (cellTarget) {
     const measureTarget = cellTarget.matches("[data-measure-row]") ? cellTarget : null;
@@ -729,6 +745,21 @@ document.addEventListener("pointerdown", (event) => {
     }, 520);
   }
 
+  const scrollTrack = event.target.closest(".scroll-track");
+  if (scrollTrack) {
+    event.preventDefault();
+    const chart = scrollTrack.closest(".chart-scroll-shell")?.querySelector(".chart-wrap");
+    if (!chart) return;
+    chartTrackDrag = {
+      pointerId: event.pointerId,
+      chart,
+      track: scrollTrack,
+      startX: event.clientX,
+      scrollLeft: chart.scrollLeft
+    };
+    scrollTrack.setPointerCapture?.(event.pointerId);
+  }
+
   const handle = event.target.closest("[data-resize='label-width']");
   if (!handle) return;
   event.preventDefault();
@@ -745,20 +776,59 @@ document.addEventListener("pointerdown", (event) => {
 });
 
 document.addEventListener("pointermove", () => {
-  clearLongPressTimer();
+  if (!chartPan && !chartTrackDrag) clearLongPressTimer();
 });
 
 document.addEventListener("pointermove", (event) => {
+  if (chartPan && event.pointerId === chartPan.pointerId) {
+    const dx = event.clientX - chartPan.startX;
+    const dy = event.clientY - chartPan.startY;
+    if (chartPan.moved || Math.hypot(dx, dy) > 5) {
+      chartPan.moved = true;
+      clearLongPressTimer();
+      event.preventDefault();
+      chartPan.chart.scrollLeft = chartPan.scrollLeft - dx;
+      chartPan.chart.scrollTop = chartPan.scrollTop - dy;
+      syncChartScrollTrack(chartPan.chart);
+    }
+    return;
+  }
+
+  if (chartTrackDrag && event.pointerId === chartTrackDrag.pointerId) {
+    event.preventDefault();
+    const maxScroll = chartTrackDrag.chart.scrollWidth - chartTrackDrag.chart.clientWidth;
+    const maxTravel = chartTrackDrag.track.clientWidth - chartTrackDrag.track.querySelector("span").clientWidth;
+    if (maxScroll > 0 && maxTravel > 0) {
+      chartTrackDrag.chart.scrollLeft = chartTrackDrag.scrollLeft + ((event.clientX - chartTrackDrag.startX) / maxTravel) * maxScroll;
+      syncChartScrollTrack(chartTrackDrag.chart);
+    }
+    return;
+  }
+
   if (!chartResize || event.pointerId !== chartResize.pointerId) return;
   const width = clampLabelWidth(chartResize.startWidth + event.clientX - chartResize.startX);
   state.labelWidth = width;
   chartResize.chart?.style.setProperty("--label-width", `${width}px`);
 });
 
-document.addEventListener("pointerup", clearLongPressTimer);
-document.addEventListener("pointercancel", clearLongPressTimer);
+document.addEventListener("pointerup", finishChartPan);
+document.addEventListener("pointercancel", finishChartPan);
 document.addEventListener("pointerup", finishChartResize);
 document.addEventListener("pointercancel", finishChartResize);
+
+document.addEventListener("scroll", (event) => {
+  if (event.target.matches?.(".chart-wrap")) syncChartScrollTrack(event.target);
+}, true);
+
+document.addEventListener("wheel", (event) => {
+  const chart = event.target.closest?.(".chart-wrap");
+  if (!chart) return;
+  const canScrollX = chart.scrollWidth > chart.clientWidth;
+  if (!canScrollX || Math.abs(event.deltaX) >= Math.abs(event.deltaY)) return;
+  event.preventDefault();
+  chart.scrollLeft += event.deltaY;
+  syncChartScrollTrack(chart);
+}, { passive: false });
 
 document.addEventListener("change", (event) => {
   if (event.target.matches("[name='rowId']")) {
@@ -1516,6 +1586,7 @@ function render() {
   syncScrollLock();
   syncBpmTicker();
   syncRealtimeConnection();
+  requestAnimationFrame(syncChartScrollTracks);
 }
 
 function syncScrollLock() {
@@ -3690,6 +3761,36 @@ function finishChartResize(event) {
   chartResize = null;
   save();
   render();
+}
+
+function finishChartPan(event) {
+  if (chartPan && event.pointerId === chartPan.pointerId) {
+    if (chartPan.moved) suppressClickUntil = Date.now() + 180;
+    syncChartScrollTrack(chartPan.chart);
+    chartPan = null;
+  }
+  if (chartTrackDrag && event.pointerId === chartTrackDrag.pointerId) {
+    suppressClickUntil = Date.now() + 180;
+    syncChartScrollTrack(chartTrackDrag.chart);
+    chartTrackDrag = null;
+  }
+  clearLongPressTimer();
+}
+
+function syncChartScrollTrack(chart) {
+  const shell = chart.closest(".chart-scroll-shell");
+  const thumb = shell?.querySelector(".scroll-track span");
+  if (!thumb) return;
+  const maxScroll = chart.scrollWidth - chart.clientWidth;
+  const ratio = chart.scrollWidth > 0 ? chart.clientWidth / chart.scrollWidth : 1;
+  const width = Math.max(18, Math.min(100, ratio * 100));
+  const left = maxScroll > 0 ? (chart.scrollLeft / maxScroll) * (100 - width) : 0;
+  thumb.style.width = `${width}%`;
+  thumb.style.marginLeft = `${left}%`;
+}
+
+function syncChartScrollTracks() {
+  document.querySelectorAll(".chart-wrap").forEach(syncChartScrollTrack);
 }
 
 function clampLabelSize(value) {
