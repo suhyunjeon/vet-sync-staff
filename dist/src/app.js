@@ -194,6 +194,12 @@ function handleRouteChange() {
 
 window.addEventListener("popstate", handleRouteChange);
 window.addEventListener("hashchange", handleRouteChange);
+window.addEventListener("pagehide", () => {
+  state.quickOpen = false;
+  state.entryPanelOpen = false;
+  save();
+  syncScrollLock();
+});
 
 document.addEventListener("click", (event) => {
   if (Date.now() < suppressClickUntil) {
@@ -1436,11 +1442,13 @@ function applyRouteFromHash() {
     state.patientId = patientId;
     state.chartDetailOpen = true;
     state.quickOpen = false;
+    state.entryPanelOpen = false;
     return;
   }
   if (state.section === "chart") {
     state.chartDetailOpen = false;
     state.quickOpen = false;
+    state.entryPanelOpen = false;
   }
 }
 
@@ -1465,6 +1473,7 @@ function openChartDetail(patientId, options = {}) {
   state.view = "chart";
   state.chartDetailOpen = true;
   state.quickOpen = false;
+  state.entryPanelOpen = false;
   const nextHash = chartHash(patientId);
   if (window.location.hash === nextHash) return;
   if (options.replace) {
@@ -1479,6 +1488,7 @@ function showChartList() {
   state.view = "chart";
   state.chartDetailOpen = false;
   state.quickOpen = false;
+  state.entryPanelOpen = false;
   closeChartRoute();
 }
 
@@ -1491,8 +1501,14 @@ function render() {
   app.innerHTML = state.authed
     ? `${renderApp()}${state.calendarOpen ? renderCalendarSheet() : ""}${state.helpOpen ? renderHelpBubble() : ""}`
     : renderLogin();
+  syncScrollLock();
   syncBpmTicker();
   syncRealtimeConnection();
+}
+
+function syncScrollLock() {
+  document.documentElement.classList.toggle("entry-panel-locked", Boolean(state.entryPanelOpen));
+  document.body.classList.toggle("entry-panel-locked", Boolean(state.entryPanelOpen));
 }
 
 function renderLogin() {
@@ -2335,8 +2351,9 @@ function renderChart(patient) {
 function renderQuickInput(patient) {
   const row = rows.find((item) => item.id === state.rowId) || rows[0];
   const size = getQuickSize();
+  const showKeypad = shouldShowKeypad(row.id);
   return `
-    <form class="quick-panel" data-form="entry" style="--quick-sheet-height: ${size.sheetHeight}vh">
+    <form class="quick-panel ${showKeypad ? "" : "no-keypad"}" data-form="entry" style="--quick-sheet-height: ${size.sheetHeight}vh">
       <input type="hidden" name="patientId" value="${patient.id}" />
       <div class="quick-head">
         <div>
@@ -2435,7 +2452,6 @@ function renderTasksScreen() {
       <div class="screen-toolbar">
         <strong>총 ${tasks.length}건</strong>
         <div>
-          <button data-action="scroll-top">맨 위</button>
           <button class="${state.view === "cards" ? "active" : ""}" data-action="set-view" data-value="cards">간단히 보기</button>
           <button class="${state.view !== "cards" ? "active" : ""}" data-action="set-view" data-value="chart">시간대 별</button>
           <button data-action="open-order-settings" ${canManageClinical() ? "" : "disabled"}>To do 설정</button>
@@ -2656,7 +2672,7 @@ function renderQuickScreen(patient) {
           ${clearableControl(`<textarea name="value" placeholder="결과/완료/메모 입력" autocomplete="off" required></textarea>`)}
         </div>
         ${state.entrySaveNotice ? `<p class="entry-save-notice">${state.entrySaveNotice}</p>` : ""}
-        ${renderEntryPresets()}
+        ${renderEntryPresets(row.id)}
         <div class="quick-entry-layout">
           <div class="quick-row-picker">
             ${rows
@@ -2670,12 +2686,7 @@ function renderQuickScreen(patient) {
               )
               .join("")}
           </div>
-          <div class="keypad">
-            ${["1", "2", "3", "4", "5", "6", "7", "8", "9", "dot", "0"]
-              .map((key) => `<button type="button" data-action="append" data-value="${key}">${key === "dot" ? "-/+." : key}</button>`)
-              .join("")}
-            <button class="save" type="submit">기록 저장</button>
-          </div>
+          ${showKeypad ? renderQuickKeypad() : `<button class="quick-save-wide" type="submit">기록 저장</button>`}
         </div>
       </form>
       <label class="patient-search">
@@ -2687,33 +2698,47 @@ function renderQuickScreen(patient) {
   `;
 }
 
-function renderEntryPresets() {
-  const presets = presetsForRow(state.rowId);
+function renderQuickKeypad() {
   return `
-    <div class="entry-presets" aria-label="빠른 기록">
-      ${presets
-        .map(([value, label]) => `<button type="button" data-action="preset-value" data-value="${escapeAttr(value)}">${label}</button>`)
+    <div class="keypad">
+      ${["1", "2", "3", "4", "5", "6", "7", "8", "9", "dot", "0"]
+        .map((key) => `<button type="button" data-action="append" data-value="${key}">${key === "dot" ? "-/+." : key}</button>`)
         .join("")}
+      <button class="save" type="submit">기록 저장</button>
     </div>
   `;
 }
 
+function renderEntryPresets(rowId) {
+  const presets = presetsForRow(rowId);
+  if (!presets.length) return "";
+  return `
+    <div class="entry-presets" aria-label="빠른 기록">
+      ${presets.map(([value, label]) => `<button type="button" data-action="preset-value" data-value="${escapeAttr(value)}">${label}</button>`).join("")}
+    </div>
+  `;
+}
+
+function shouldShowKeypad(rowId) {
+  return ["weight", "temp", "bp", "pulse", "resp"].includes(rowId);
+}
+
 function presetsForRow(rowId) {
   const presetMap = {
-    weight: [["체중 측정", "체중"]],
-    temp: [["정상", "정상"], ["발열", "발열"], ["저체온", "저체온"]],
-    bp: [["혈압 재확인", "재확인"], ["도플러", "도플러"], ["측정 보류", "보류"]],
-    pulse: [["심박수", "심박수"], ["Murmur 없음", "Murmur 없음"], ["부정맥 없음", "부정맥 없음"]],
-    resp: [["P(헐떡임)", "P"], ["SRR(숙면중 호흡수)", "SRR"], ["호흡 안정", "호흡 안정"]],
-    vomit: [["구토 없음", "구토 없음"], ["구토 1회", "구토 1회"], ["거품토", "거품토"], ["사료토", "사료토"]],
+    weight: [],
+    temp: [["정상", "정상"], ["발열", "발열"]],
+    bp: [],
+    pulse: [],
+    resp: [["P(헐떡임)", "P"], ["SRR(숙면중 호흡수)", "SRR"]],
+    vomit: [["구토 없음", "구토 없음"], ["거품토", "거품토"], ["사료토", "사료토"]],
     feces: [["설사", "설사"], ["정상변", "정상변"], ["혈변", "혈변"], ["점액변", "점액변"], ["변비", "변비"]],
-    urine: [["정상뇨", "정상뇨"], ["혈뇨", "혈뇨"], ["점액뇨", "점액뇨"], ["배뇨 없음", "배뇨 없음"]],
+    urine: [["정상뇨", "정상뇨"], ["혈뇨", "혈뇨"], ["배뇨 없음", "배뇨 없음"]],
     diet: [["강급", "강급"], ["핸드피딩", "핸드피딩"], ["잘먹음", "잘먹음"], ["식욕감소", "식욕감소"]],
-    water: [["수액 유지", "수액 유지"], ["라인 확인", "라인 확인"], ["용량 재확인", "용량 재확인"]],
+    water: [["수액 유지", "수액 유지"], ["라인 확인", "라인 확인"]],
     urinary: [["압박배뇨 완료", "완료"], ["자발배뇨", "자발배뇨"], ["배뇨 없음", "배뇨 없음"]],
-    guardian: [["보호자 연락", "보호자 연락"], ["안내 완료", "안내 완료"], ["오전 연락", "오전 연락"]]
+    guardian: []
   };
-  return presetMap[rowId] || [["완료", "완료"], ["특이사항 없음", "특이사항 없음"], ["보류", "보류"], ["거부", "거부"]];
+  return presetMap[rowId] ?? [["완료", "완료"], ["보류", "보류"]];
 }
 
 function rowLabel(rowId) {

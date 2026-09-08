@@ -39,6 +39,17 @@ body {
   min-width: 320px;
 }
 
+html.entry-panel-locked,
+body.entry-panel-locked {
+  overflow: hidden;
+  overscroll-behavior: none;
+}
+
+body.entry-panel-locked .phone-app {
+  height: 100dvh;
+  overflow: hidden;
+}
+
 button,
 input,
 select {
@@ -179,6 +190,14 @@ button {
   padding-bottom: 86px;
 }
 
+.app-header {
+  position: sticky;
+  top: 0;
+  z-index: 17;
+  border-bottom: 1px solid rgba(216, 224, 234, 0.72);
+  backdrop-filter: blur(18px);
+}
+
 .floating-top-button {
   position: fixed;
   right: 14px;
@@ -283,14 +302,18 @@ button {
 .date-switcher {
   display: flex;
   align-items: center;
-  gap: 14px;
+  gap: 6px;
   min-width: 0;
+  border: 1px solid rgba(216, 224, 234, 0.88);
+  border-radius: 999px;
+  padding: 3px;
+  background: rgba(255, 255, 255, 0.82);
 }
 
 .date-display {
   min-width: 0;
-  border-radius: 8px;
-  padding: 7px 8px;
+  border-radius: 999px;
+  padding: 7px 10px;
   color: inherit;
   background: transparent;
 }
@@ -302,7 +325,7 @@ button {
 .date-display strong {
   display: block;
   overflow: hidden;
-  font-size: clamp(19px, 5.4vw, 26px);
+  font-size: 20px;
   letter-spacing: 0;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -620,6 +643,10 @@ button {
   background: #ffffff;
   font-size: 14px;
   font-weight: 750;
+}
+
+.chart-search-field input {
+  width: min(240px, 48vw);
 }
 
 .chart-list-toolbar select {
@@ -1061,6 +1088,13 @@ button {
   border: 1px solid var(--line);
   border-radius: 8px;
   background: #ffffff;
+  overscroll-behavior: contain;
+  -webkit-overflow-scrolling: touch;
+}
+
+.entry-panel-locked .quick-panel {
+  max-height: 100dvh;
+  overflow-y: auto;
 }
 
 .patient-list {
@@ -2468,6 +2502,10 @@ button {
   gap: 14px;
 }
 
+.quick-panel.no-keypad .quick-entry-layout {
+  grid-template-columns: minmax(120px, 0.7fr) minmax(0, 1fr);
+}
+
 .quick-row-picker {
   display: grid;
   gap: 4px;
@@ -2491,6 +2529,16 @@ button {
   color: var(--mint-dark);
   background: #ffffff;
   font-weight: 850;
+}
+
+.quick-save-wide {
+  align-self: stretch;
+  min-height: 72px;
+  border-radius: 8px;
+  color: #ffffff;
+  background: var(--primary);
+  font-size: 18px;
+  font-weight: 900;
 }
 
 .patient-search {
@@ -2986,7 +3034,8 @@ button {
   grid-template-columns: repeat(5, 1fr);
   padding: 7px 8px max(7px, env(safe-area-inset-bottom));
   border-top: 1px solid var(--line);
-  background: rgba(255, 255, 255, 0.96);
+  background: rgba(255, 255, 255, 0.94);
+  backdrop-filter: blur(18px);
 }
 
 .bottom-nav button {
@@ -2994,12 +3043,15 @@ button {
   display: grid;
   justify-items: center;
   gap: 2px;
+  min-height: 54px;
+  border-radius: 8px;
   color: #b6bcba;
   background: transparent;
 }
 
 .bottom-nav button.active {
   color: var(--mint-dark);
+  background: #eff6ff;
 }
 
 .bottom-nav button.help-target {
@@ -3029,6 +3081,7 @@ button {
   place-items: center;
   min-width: 17px;
   height: 17px;
+  padding: 0 5px;
   border-radius: 999px;
   color: #ffffff;
   background: #ef4444;
@@ -3338,6 +3391,8 @@ button {
     overflow-y: hidden;
     background: #f8fafc;
     box-shadow: none;
+    overscroll-behavior: contain;
+    touch-action: pan-x;
   }
 
   .quick-launcher {
@@ -3429,6 +3484,36 @@ button {
 }
 
 @media (max-width: 720px) and (orientation: portrait) {
+  html {
+    background: #f6f8fb;
+  }
+
+  .phone-app {
+    padding-bottom: 92px;
+  }
+
+  .app-header {
+    gap: 6px;
+    padding: max(10px, env(safe-area-inset-top)) 12px 8px;
+    background: rgba(246, 248, 251, 0.88);
+  }
+
+  .date-switcher {
+    flex: 1 1 auto;
+    justify-content: center;
+    max-width: 250px;
+    margin: 0 auto;
+  }
+
+  .date-switcher .plain-icon {
+    width: 32px;
+    height: 32px;
+  }
+
+  .date-display strong {
+    font-size: 18px;
+  }
+
   .quick-panel {
     inset: 0;
     width: 100dvw;
@@ -3438,6 +3523,7 @@ button {
     overflow-x: hidden;
     overflow-y: auto;
     transform: none;
+    touch-action: pan-y;
   }
 
   .quick-fields {
@@ -3453,17 +3539,33 @@ button {
   }
 
   .menu-screen {
-    width: calc(100% - 28px);
-    padding-top: 10px;
+    width: calc(100% - 20px);
+    padding-top: 8px;
   }
 
   .screen-toolbar strong {
     font-size: 17px;
   }
 
+  .screen-toolbar {
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 8px;
+    margin-bottom: 10px;
+  }
+
+  .screen-toolbar div {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(94px, 1fr));
+    gap: 4px;
+    width: 100%;
+    border-radius: 8px;
+    padding: 4px;
+  }
+
   .screen-toolbar button {
-    min-height: 32px;
-    padding: 0 10px;
+    min-height: 38px;
+    padding: 0 8px;
     font-size: 12px;
   }
 
@@ -3483,8 +3585,38 @@ button {
     align-items: flex-start;
   }
 
+  .order-composer {
+    width: calc(100% - 20px);
+    gap: 14px;
+    margin-bottom: 12px;
+    padding: 14px;
+  }
+
+  .order-composer header strong {
+    font-size: 18px;
+  }
+
+  .order-composer header button {
+    min-height: 42px;
+    padding: 0 16px;
+    font-size: 14px;
+  }
+
   .order-form {
     grid-template-columns: 1fr;
+    gap: 12px;
+  }
+
+  .order-form input,
+  .order-form select,
+  .order-form textarea {
+    min-height: 48px;
+    font-size: 16px;
+  }
+
+  .order-form .primary-action {
+    min-height: 50px;
+    grid-column: 1 / -1;
   }
 
   .clinical-panel form {
@@ -3507,19 +3639,55 @@ button {
   .chart-list-toolbar {
     display: grid;
     grid-template-columns: 1fr;
-    gap: 8px;
+    gap: 10px;
+    position: sticky;
+    top: 58px;
+    z-index: 12;
+    margin: 0 -2px 12px;
+    border: 1px solid rgba(216, 224, 234, 0.82);
+    border-radius: 8px;
+    padding: 10px;
+    background: rgba(255, 255, 255, 0.94);
+    box-shadow: 0 10px 28px rgba(15, 23, 42, 0.07);
+  }
+
+  .chart-list-toolbar strong {
+    font-size: 16px;
   }
 
   .chart-list-toolbar div {
-    flex-wrap: wrap;
-    justify-content: space-between;
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 8px;
+  }
+
+  .chart-list-toolbar .chart-search-field {
+    grid-column: 1 / -1;
+  }
+
+  .chart-list-toolbar input,
+  .chart-search-field input {
+    width: 100%;
+    min-height: 46px;
+    border-radius: 8px;
+    padding: 0 14px;
+    font-size: 16px;
   }
 
   .chart-list-toolbar select {
-    font-size: 14px;
+    width: 100%;
+    min-height: 40px;
+    border: 1px solid #d7e3f7;
+    border-radius: 999px;
+    padding: 0 26px 0 12px;
+    background: #f8fafc;
+    font-size: 13px;
   }
 
   .chart-list-toolbar button {
+    width: 100%;
+    min-height: 40px;
+    border-radius: 999px;
     font-size: 13px;
   }
 
@@ -3536,21 +3704,37 @@ button {
   }
 
   .chart-list-grid {
-    gap: 12px;
+    gap: 10px;
   }
 
   .chart-list-grid .patient-card {
-    border-radius: 24px;
+    border-radius: 8px;
+    box-shadow: 0 8px 22px rgba(15, 23, 42, 0.05);
   }
 
   .chart-list-grid .patient-card button {
-    grid-template-columns: minmax(0, 1fr) max-content;
-    min-height: 166px;
-    padding: 18px;
+    grid-template-columns: auto minmax(0, 1fr);
+    min-height: 112px;
+    padding: 14px;
+  }
+
+  .chart-list-grid .patient-card dl {
+    grid-column: 1 / -1;
+    grid-template-columns: repeat(3, max-content);
+    justify-content: start;
+    justify-items: start;
+    gap: 6px;
+    margin-top: 2px;
+  }
+
+  .avatar-card {
+    width: 58px;
+    height: 58px;
   }
 
   .chart-list-grid .patient-card h2 {
-    font-size: 20px;
+    margin-top: 2px;
+    font-size: 18px;
   }
 
   .chart-list-grid .patient-card p {
@@ -3559,27 +3743,29 @@ button {
 
   .chart-list-grid .patient-card dt,
   .chart-list-grid .patient-card dd:first-of-type {
-    padding: 6px 10px;
-    font-size: 12px;
+    padding: 5px 9px;
+    font-size: 11px;
   }
 
   .chart-list-grid .patient-card dd:last-child {
-    margin-top: 10px;
-    font-size: 12px;
+    margin-top: 0;
+    font-size: 11px;
   }
 
   .work-list {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-    gap: 10px;
+    grid-template-columns: 1fr;
+    gap: 9px;
   }
 
   .work-card {
-    min-height: 188px;
-    padding: 12px;
+    min-height: 0;
+    grid-template-columns: minmax(0, 1fr);
+    padding: 14px;
+    border-radius: 8px;
   }
 
   .work-card strong {
-    font-size: 18px;
+    font-size: 17px;
   }
 
   .work-card h2 {
@@ -3591,14 +3777,16 @@ button {
   }
 
   .work-card footer {
-    display: grid;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
     gap: 8px;
-    margin-top: 16px;
+    margin-top: 12px;
   }
 
   .work-card footer button {
-    justify-self: end;
-    min-height: 34px;
+    min-height: 40px;
+    padding: 0 14px;
     font-size: 13px;
   }
 
@@ -3622,6 +3810,20 @@ button {
   .quick-entry-layout {
     grid-template-columns: minmax(104px, 0.8fr) minmax(0, 1.45fr);
     gap: 10px;
+  }
+
+  .quick-panel.no-keypad .quick-entry-layout {
+    grid-template-columns: 1fr;
+  }
+
+  .quick-panel.no-keypad .quick-row-picker {
+    max-height: 164px;
+    overflow-y: auto;
+  }
+
+  .quick-save-wide {
+    min-height: 52px;
+    font-size: 17px;
   }
 
   .quick-row-picker {
