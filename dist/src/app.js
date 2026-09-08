@@ -203,6 +203,18 @@ document.addEventListener("click", (event) => {
   const action = event.target.closest("[data-action]");
   if (!action) return;
 
+  if (action.dataset.action === "clear-field") {
+    const field = action.closest(".clearable-field");
+    const input = field?.querySelector("input, textarea");
+    if (!input) return;
+    input.value = "";
+    field.classList.remove("has-value");
+    input.dispatchEvent(new Event("input", { bubbles: true }));
+    input.dispatchEvent(new Event("change", { bubbles: true }));
+    input.focus();
+    return;
+  }
+
   if (action.dataset.action === "login") {
     state.authed = true;
     save();
@@ -571,6 +583,7 @@ document.addEventListener("click", (event) => {
     const input = document.querySelector("[name='value']");
     if (!input) return;
     input.value = `${input.value}${action.dataset.value === "dot" ? "." : action.dataset.value}`;
+    syncClearableField(input);
     input.focus();
     return;
   }
@@ -580,6 +593,7 @@ document.addEventListener("click", (event) => {
     if (!input) return;
     const value = action.dataset.value || "";
     input.value = input.value ? `${input.value} / ${value}` : value;
+    syncClearableField(input);
     input.focus();
     return;
   }
@@ -589,6 +603,7 @@ document.addEventListener("click", (event) => {
     if (!input) return;
     const value = action.dataset.value || "";
     input.value = input.value ? `${input.value} / ${value}` : value;
+    syncClearableField(input);
     input.focus();
     return;
   }
@@ -833,6 +848,11 @@ document.addEventListener("change", (event) => {
 });
 
 document.addEventListener("input", (event) => {
+  const clearable = event.target.closest?.(".clearable-field");
+  if (clearable && event.target.matches("input, textarea")) {
+    syncClearableField(event.target);
+  }
+
   if (event.target.matches("[data-calc-field]")) {
     state[event.target.name] = event.target.value;
     save();
@@ -1547,6 +1567,7 @@ function renderApp() {
       </header>
 
       ${renderSection(section, patient)}
+      ${renderFloatingTopButton(section)}
 
       <nav class="bottom-nav" aria-label="하단 메뉴">
         ${navItems
@@ -1566,6 +1587,15 @@ function renderApp() {
         </button>
       </nav>
     </main>
+  `;
+}
+
+function renderFloatingTopButton(section) {
+  if (!["chart", "tasks"].includes(section)) return "";
+  return `
+    <button class="floating-top-button" type="button" data-action="scroll-top" aria-label="맨 위로 이동">
+      TOP
+    </button>
   `;
 }
 
@@ -1746,7 +1776,7 @@ function renderPatientRegisterForm() {
         </label>
         <label class="patient-register-wide">
           <span>프로필 사진 URL</span>
-          <input name="newPhotoUrl" type="url" placeholder="https://..." autocomplete="off" />
+          ${clearableControl(`<input name="newPhotoUrl" type="url" placeholder="https://..." autocomplete="off" />`)}
         </label>
         <label>
           <span>종</span>
@@ -1811,11 +1841,11 @@ function renderPatientRegisterForm() {
         </label>
         <label class="patient-register-wide">
           <span>CC</span>
-          <textarea name="newCc" placeholder="주호소 또는 입원 목적"></textarea>
+          ${clearableControl(`<textarea name="newCc" placeholder="주호소 또는 입원 목적"></textarea>`)}
         </label>
         <label class="patient-register-wide">
           <span>DX</span>
-          <textarea name="newDx" placeholder="진단/경과 메모"></textarea>
+          ${clearableControl(`<textarea name="newDx" placeholder="진단/경과 메모"></textarea>`)}
         </label>
       </div>
       <button class="primary-action" type="submit">등록하고 차트 열기</button>
@@ -2129,7 +2159,7 @@ function renderGuardianPanel(patient) {
       </header>
       <form data-form="clinical-record" data-record-type="guardian">
         <input type="hidden" name="patientId" value="${patient.id}" />
-        <input name="summary" placeholder="예: 식욕/활력 안내 완료" ${canManageClinical() ? "" : "disabled"} required />
+        ${clearableControl(`<input name="summary" placeholder="예: 식욕/활력 안내 완료" ${canManageClinical() ? "" : "disabled"} required />`)}
         <button type="submit" ${canManageClinical() ? "" : "disabled"}>기록</button>
       </form>
       ${renderClinicalList(updates, "보호자 업데이트 없음")}
@@ -2154,7 +2184,7 @@ function renderPatientEditForm(patient) {
         ${patientTextField("editGuardian", "보호자", patient.guardian)}
         <label class="patient-register-wide">
           <span>프로필 사진 URL</span>
-          <input name="editPhotoUrl" type="url" value="${escapeAttr(patient.photoUrl || "")}" placeholder="https://..." autocomplete="off" />
+          ${clearableControl(`<input name="editPhotoUrl" type="url" value="${escapeAttr(patient.photoUrl || "")}" placeholder="https://..." autocomplete="off" />`, patient.photoUrl)}
         </label>
         <label>
           <span>종</span>
@@ -2203,11 +2233,11 @@ function renderPatientEditForm(patient) {
         </label>
         <label class="patient-register-wide">
           <span>CC</span>
-          <textarea name="editCc">${patient.cc || ""}</textarea>
+          ${clearableControl(`<textarea name="editCc">${patient.cc || ""}</textarea>`, patient.cc)}
         </label>
         <label class="patient-register-wide">
           <span>DX</span>
-          <textarea name="editDx">${patient.dx || ""}</textarea>
+          ${clearableControl(`<textarea name="editDx">${patient.dx || ""}</textarea>`, patient.dx)}
         </label>
       </div>
       <button class="primary-action" type="submit">수정 저장</button>
@@ -2220,9 +2250,22 @@ function patientTextField(name, label, value, inputMode = "") {
   return `
     <label>
       <span>${label}</span>
-      <input name="${name}" ${inputMode ? `inputmode="${inputMode}"` : ""} value="${escapeAttr(value || "")}" autocomplete="off" ${required} />
+      ${clearableControl(`<input name="${name}" ${inputMode ? `inputmode="${inputMode}"` : ""} value="${escapeAttr(value || "")}" autocomplete="off" ${required} />`, value)}
     </label>
   `;
+}
+
+function clearableControl(controlHtml, value = "") {
+  return `
+    <div class="clearable-field ${String(value || "").trim() ? "has-value" : ""}">
+      ${controlHtml}
+      <button class="clear-field-button" type="button" data-action="clear-field" aria-label="필드 초기화">×</button>
+    </div>
+  `;
+}
+
+function syncClearableField(input) {
+  input.closest(".clearable-field")?.classList.toggle("has-value", Boolean(input.value));
 }
 
 function renderChartMode(patient) {
@@ -2317,11 +2360,11 @@ function renderQuickInput(patient) {
         </label>
         <label>
           <span>결과</span>
-          <textarea name="value" placeholder="${row.placeholder} 또는 특이사항 메모" autocomplete="off" required></textarea>
+          ${clearableControl(`<textarea name="value" placeholder="${row.placeholder} 또는 특이사항 메모" autocomplete="off" required></textarea>`)}
         </label>
         <label>
           <span>작성자</span>
-          <input name="staff" value="${patient.doctor}" />
+          ${clearableControl(`<input name="staff" value="${escapeAttr(patient.doctor)}" />`, patient.doctor)}
         </label>
       </div>
       ${renderEntryPresets()}
@@ -2423,7 +2466,7 @@ function renderHandoffPanel(patient) {
         </label>
         <label class="order-form-wide">
           <span>인수인계</span>
-          <input name="summary" placeholder="예: 21시 혈압 재확인, 보호자 오전 연락" required />
+          ${clearableControl(`<input name="summary" placeholder="예: 21시 혈압 재확인, 보호자 오전 연락" required />`)}
         </label>
         <button class="primary-action" type="submit">노트 추가</button>
       </form>
@@ -2500,11 +2543,11 @@ function renderOrderComposer(patient) {
               ${renderOrderPresets(orderRowId)}
               <label class="order-form-wide">
                 <span>오더</span>
-                <input name="orderTitle" placeholder="예: 항생제 IV, 혈압 재측정" autocomplete="off" required />
+                ${clearableControl(`<input name="orderTitle" placeholder="예: 항생제 IV, 혈압 재측정" autocomplete="off" required />`)}
               </label>
               <label class="order-form-wide">
                 <span>메모</span>
-                <textarea name="orderNote" placeholder="용량, 주의사항, 보호자 안내 등"></textarea>
+                ${clearableControl(`<textarea name="orderNote" placeholder="용량, 주의사항, 보호자 안내 등"></textarea>`)}
               </label>
               <button class="primary-action" type="submit" ${canManageClinical() ? "" : "disabled"}>오더 추가</button>
             </form>
@@ -2610,7 +2653,7 @@ function renderQuickScreen(patient) {
         <input type="hidden" name="hour" value="${currentTimeSlot(chartIntervalForPatient(patient))}" />
         <div class="quick-search">
           <span>▣</span>
-          <textarea name="value" placeholder="결과/완료/메모 입력" autocomplete="off" required></textarea>
+          ${clearableControl(`<textarea name="value" placeholder="결과/완료/메모 입력" autocomplete="off" required></textarea>`)}
         </div>
         ${state.entrySaveNotice ? `<p class="entry-save-notice">${state.entrySaveNotice}</p>` : ""}
         ${renderEntryPresets()}

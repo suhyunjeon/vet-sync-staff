@@ -179,6 +179,28 @@ button {
   padding-bottom: 86px;
 }
 
+.floating-top-button {
+  position: fixed;
+  right: 14px;
+  bottom: calc(76px + env(safe-area-inset-bottom));
+  z-index: 19;
+  display: grid;
+  place-items: center;
+  width: 52px;
+  height: 52px;
+  border: 1px solid rgba(29, 78, 216, 0.22);
+  border-radius: 999px;
+  color: #ffffff;
+  background: #1d4ed8;
+  font-size: 12px;
+  font-weight: 900;
+  box-shadow: 0 12px 28px rgba(15, 23, 42, 0.18);
+}
+
+.floating-top-button:active {
+  transform: translateY(1px);
+}
+
 .tutorial-backdrop {
   position: fixed;
   inset: 0;
@@ -910,6 +932,57 @@ button {
   resize: vertical;
 }
 
+.clearable-field {
+  position: relative;
+  display: block;
+  min-width: 0;
+}
+
+.clearable-field input,
+.clearable-field textarea {
+  padding-right: 42px;
+}
+
+.clear-field-button {
+  display: none;
+  position: absolute;
+  top: 50%;
+  right: 8px;
+  width: 28px;
+  height: 28px;
+  min-height: 0;
+  border: 0;
+  border-radius: 999px;
+  padding: 0;
+  color: #475467;
+  background: #eef2f7;
+  font-size: 18px;
+  font-weight: 900;
+  line-height: 1;
+  transform: translateY(-50%);
+}
+
+.clearable-field textarea + .clear-field-button {
+  top: 16px;
+  transform: none;
+}
+
+.clearable-field.has-value .clear-field-button {
+  display: grid;
+  place-items: center;
+}
+
+.clear-field-button:hover,
+.clear-field-button:focus-visible {
+  color: #ffffff;
+  background: #1d4ed8;
+}
+
+.quick-search .clearable-field,
+.patient-search .clearable-field {
+  flex: 1 1 auto;
+}
+
 .order-form-wide {
   grid-column: span 2;
 }
@@ -1361,6 +1434,58 @@ button {
   color: #98a2b3;
   background: #eef2f7;
   cursor: not-allowed;
+}
+
+.patient-register-form .clearable-field input,
+.patient-register-form .clearable-field textarea,
+.order-form .clearable-field input,
+.order-form .clearable-field textarea,
+.clinical-panel .clearable-field input,
+.clinical-panel .clearable-field textarea,
+.quick-panel .clearable-field input,
+.quick-panel .clearable-field textarea,
+.quick-entry-card .clearable-field textarea {
+  padding-right: 42px;
+}
+
+.patient-register-form .clear-field-button,
+.order-form .clear-field-button,
+.clinical-panel form .clear-field-button,
+.quick-panel .clear-field-button,
+.quick-entry-card .clear-field-button {
+  display: none;
+  position: absolute;
+  top: 50%;
+  right: 8px;
+  width: 28px;
+  height: 28px;
+  min-height: 0;
+  border: 0;
+  border-radius: 999px;
+  padding: 0;
+  color: #475467;
+  background: #eef2f7;
+  font-size: 18px;
+  font-weight: 900;
+  line-height: 1;
+  transform: translateY(-50%);
+}
+
+.patient-register-form .clearable-field.has-value .clear-field-button,
+.order-form .clearable-field.has-value .clear-field-button,
+.clinical-panel form .clearable-field.has-value .clear-field-button,
+.quick-panel .clearable-field.has-value .clear-field-button,
+.quick-entry-card .clearable-field.has-value .clear-field-button {
+  display: grid;
+  place-items: center;
+}
+
+.patient-register-form .clearable-field textarea + .clear-field-button,
+.order-form .clearable-field textarea + .clear-field-button,
+.quick-panel .clearable-field textarea + .clear-field-button,
+.quick-entry-card .clearable-field textarea + .clear-field-button {
+  top: 8px;
+  transform: none;
 }
 
 .vital-bars {
@@ -3564,6 +3689,13 @@ button {
 @media (max-height: 540px) and (orientation: landscape) {
   .phone-app {
     padding-bottom: 0;
+  }
+
+  .floating-top-button {
+    right: 12px;
+    bottom: 12px;
+    width: 46px;
+    height: 46px;
   }
 
   .app-header {
