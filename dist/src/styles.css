@@ -3389,7 +3389,7 @@ button {
     position: fixed;
     inset: 0;
     z-index: 30;
-    grid-template-columns: minmax(180px, 0.75fr) minmax(260px, 1.25fr);
+    grid-template-columns: minmax(240px, 0.86fr) minmax(260px, 1.14fr);
     grid-template-rows: auto minmax(0, 1fr);
     align-content: stretch;
     gap: 10px;
@@ -3462,6 +3462,10 @@ button {
     border-radius: 8px;
     padding: 10px;
     background: #ffffff;
+  }
+
+  .quick-fields label {
+    min-width: 0;
   }
 
   .quick-entry-presets {
@@ -3537,7 +3541,8 @@ button {
     width: 100dvw;
     height: 100dvh;
     grid-template-columns: 1fr;
-    grid-template-rows: auto auto minmax(0, auto);
+    grid-template-rows: auto auto auto auto;
+    align-content: start;
     overflow-x: hidden;
     overflow-y: auto;
     transform: none;
@@ -3552,6 +3557,14 @@ button {
   .quick-entry-presets {
     grid-column: 1;
     grid-row: auto;
+  }
+
+  .quick-panel .quick-save-wide {
+    align-self: start;
+    width: 100%;
+    height: 58px;
+    min-height: 58px;
+    font-size: 16px;
   }
 
   .quick-panel .keypad {
@@ -4065,7 +4078,7 @@ button {
     position: fixed;
     inset: 0;
     z-index: 30;
-    grid-template-columns: minmax(166px, 0.72fr) minmax(240px, 1.28fr);
+    grid-template-columns: minmax(220px, 0.8fr) minmax(240px, 1.2fr);
     grid-template-rows: auto minmax(0, 1fr) auto;
     align-content: stretch;
     gap: 8px;
