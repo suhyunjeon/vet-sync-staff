@@ -523,7 +523,10 @@ button {
 }
 
 .chart-detail-shell {
+  display: grid;
+  min-height: 0;
   width: min(100% - 28px, 1280px);
+  height: calc(100dvh - 72px - 10px - 86px);
   margin: 10px auto 0;
 }
 
@@ -1320,6 +1323,9 @@ button {
 }
 
 .chart-surface {
+  display: grid;
+  grid-template-rows: auto auto auto minmax(0, 1fr);
+  min-height: 0;
   overflow: hidden;
 }
 
@@ -1664,6 +1670,7 @@ button {
   display: grid;
   grid-template-columns: minmax(0, 1fr) minmax(220px, 0.26fr);
   gap: 12px;
+  min-height: 0;
   padding: 12px;
   background: #f9fbfa;
 }
@@ -1672,12 +1679,22 @@ button {
   grid-template-columns: minmax(0, 1fr) 160px;
 }
 
+.chart-scroll-shell {
+  display: grid;
+  grid-template-rows: minmax(0, 1fr) auto;
+  min-width: 0;
+  min-height: 0;
+}
+
 .chart-wrap {
+  min-width: 0;
+  min-height: 0;
   overflow: auto;
   border: 1px solid var(--line-strong);
   border-radius: 8px;
   background: #ffffff;
   -webkit-overflow-scrolling: touch;
+  touch-action: pan-x pan-y;
 }
 
 .care-chart {
@@ -3247,6 +3264,7 @@ button {
 
   .chart-detail-shell {
     width: 100%;
+    height: calc(100dvh - 72px - 10px - 92px);
   }
 
   .realtime-strip {
@@ -4000,6 +4018,7 @@ button {
 
   .chart-detail-shell {
     width: calc(100% - 20px);
+    height: calc(100dvh - 46px - 10px);
   }
 
   .patient-list {

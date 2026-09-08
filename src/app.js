@@ -2312,51 +2312,53 @@ function renderChart(patient) {
   const chartHours = hours(patient);
   const current = currentTimeSlot(chartIntervalForPatient(patient));
   return `
-    <div class="chart-wrap" style="--label-width: ${labelSize.width}px; --cell-width: ${labelSize.cellWidth}px">
-      <table class="care-chart">
-        <thead>
-          <tr>
-            <th class="row-head">
-              <div class="label-tools">
-                <button class="label-now" type="button" data-action="select-cell" data-patient-id="${patient.id}" data-row-id="${state.rowId}" data-hour="${current}">현재</button>
-                <button class="label-step" type="button" data-action="resize-label" data-delta="-1" aria-label="항목 영역 작게">‹</button>
-                <span>${labelSize.label}</span>
-                <button class="label-step" type="button" data-action="resize-label" data-delta="1" aria-label="항목 영역 크게">›</button>
-              </div>
-              <button class="label-resize-handle" type="button" data-resize="label-width" aria-label="항목 영역 폭 조절"></button>
-            </th>
-            ${chartHours.map((hour) => `<th class="${hour === current ? "now" : ""}">${renderTimeHead(hour)}</th>`).join("")}
-          </tr>
-        </thead>
-        <tbody>
-          ${rows
-            .map(
-              (row) => `
-                <tr>
-                  <th class="row-label ${row.tone}" ${measureModeForRow(row.id) ? `data-measure-row="${row.id}" data-patient-id="${patient.id}" data-hour="${current}"` : ""}>${row.label}</th>
-                  ${chartHours
-                    .map((hour) => {
-                      const item = entries.find((entryItem) => entryItem.rowId === row.id && entryItem.hour === hour);
-                      const cellOrders = patientOrders.filter((order) => order.row.id === row.id && order.hour === hour);
-                      const selected = patient.id === state.patientId && row.id === state.rowId && hour === state.hour;
-                      return `
-                        <td class="${hour === current ? "now" : ""}">
-                          <button class="cell ${item || cellOrders.length ? "filled" : ""} ${selected ? "selected" : ""}" data-action="select-cell" data-patient-id="${patient.id}" data-row-id="${row.id}" data-hour="${hour}" ${measureModeForRow(row.id) ? `data-measure-row="${row.id}"` : ""} aria-label="${row.label} ${formatTimeLabel(hour)}">
-                            ${item ? `<strong>${item.value}</strong><small>${item.staff}</small>` : ""}
-                            ${cellOrders.map((order) => `<em class="cell-order">${escapeAttr(order.title)}</em>`).join("")}
-                          </button>
-                        </td>
-                      `;
-                    })
-                    .join("")}
-                </tr>
-              `
-            )
-            .join("")}
-        </tbody>
-      </table>
+    <div class="chart-scroll-shell" style="--label-width: ${labelSize.width}px; --cell-width: ${labelSize.cellWidth}px">
+      <div class="chart-wrap">
+        <table class="care-chart">
+          <thead>
+            <tr>
+              <th class="row-head">
+                <div class="label-tools">
+                  <button class="label-now" type="button" data-action="select-cell" data-patient-id="${patient.id}" data-row-id="${state.rowId}" data-hour="${current}">현재</button>
+                  <button class="label-step" type="button" data-action="resize-label" data-delta="-1" aria-label="항목 영역 작게">‹</button>
+                  <span>${labelSize.label}</span>
+                  <button class="label-step" type="button" data-action="resize-label" data-delta="1" aria-label="항목 영역 크게">›</button>
+                </div>
+                <button class="label-resize-handle" type="button" data-resize="label-width" aria-label="항목 영역 폭 조절"></button>
+              </th>
+              ${chartHours.map((hour) => `<th class="${hour === current ? "now" : ""}">${renderTimeHead(hour)}</th>`).join("")}
+            </tr>
+          </thead>
+          <tbody>
+            ${rows
+              .map(
+                (row) => `
+                  <tr>
+                    <th class="row-label ${row.tone}" ${measureModeForRow(row.id) ? `data-measure-row="${row.id}" data-patient-id="${patient.id}" data-hour="${current}"` : ""}>${row.label}</th>
+                    ${chartHours
+                      .map((hour) => {
+                        const item = entries.find((entryItem) => entryItem.rowId === row.id && entryItem.hour === hour);
+                        const cellOrders = patientOrders.filter((order) => order.row.id === row.id && order.hour === hour);
+                        const selected = patient.id === state.patientId && row.id === state.rowId && hour === state.hour;
+                        return `
+                          <td class="${hour === current ? "now" : ""}">
+                            <button class="cell ${item || cellOrders.length ? "filled" : ""} ${selected ? "selected" : ""}" data-action="select-cell" data-patient-id="${patient.id}" data-row-id="${row.id}" data-hour="${hour}" ${measureModeForRow(row.id) ? `data-measure-row="${row.id}"` : ""} aria-label="${row.label} ${formatTimeLabel(hour)}">
+                              ${item ? `<strong>${item.value}</strong><small>${item.staff}</small>` : ""}
+                              ${cellOrders.map((order) => `<em class="cell-order">${escapeAttr(order.title)}</em>`).join("")}
+                            </button>
+                          </td>
+                        `;
+                      })
+                      .join("")}
+                  </tr>
+                `
+              )
+              .join("")}
+          </tbody>
+        </table>
+      </div>
+      <div class="scroll-track"><span></span></div>
     </div>
-    <div class="scroll-track"><span></span></div>
   `;
 }
 
