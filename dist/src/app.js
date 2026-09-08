@@ -1037,6 +1037,7 @@ function entry(patientId, rowId, hour, value, staff) {
 function defaultState() {
   return {
     authed: false,
+    demoDateKey: DEFAULT_DATE_KEY,
     chartDate: DEFAULT_DATE_KEY,
     section: "chart",
     userRole: "vet",
@@ -1096,9 +1097,14 @@ function defaultState() {
 function loadState() {
   try {
     const saved = JSON.parse(localStorage.getItem(STORAGE_KEY) || "null");
+    const keepSavedDate = saved?.demoDateKey === DEFAULT_DATE_KEY;
+    const chartDate = keepSavedDate ? saved?.chartDate : DEFAULT_DATE_KEY;
+    const calendarMonth = keepSavedDate ? saved?.calendarMonth || chartDate : DEFAULT_DATE_KEY;
     return {
       ...defaultState(),
       ...(saved || {}),
+      demoDateKey: DEFAULT_DATE_KEY,
+      chartDate: normalizeDateKey(chartDate),
       section: "chart",
       chartDetailOpen: false,
       quickOpen: false,
@@ -1113,7 +1119,7 @@ function loadState() {
       helpOpen: localStorage.getItem(TUTORIAL_SEEN_KEY) !== "1" && saved?.helpOpen !== false,
       helpStep: Number(saved?.helpStep || 0),
       calendarOpen: false,
-      calendarMonth: normalizeMonthKey(saved?.calendarMonth || saved?.chartDate || DEFAULT_DATE_KEY),
+      calendarMonth: normalizeMonthKey(calendarMonth),
       patientSaveNotice: "",
       orderFormOpen: false,
       orderDraftPatientId: "",
