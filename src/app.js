@@ -783,12 +783,16 @@ document.addEventListener("pointermove", (event) => {
   if (chartPan && event.pointerId === chartPan.pointerId) {
     const dx = event.clientX - chartPan.startX;
     const dy = event.clientY - chartPan.startY;
+    if (!chartPan.moved && Math.abs(dy) > 5 && Math.abs(dy) > Math.abs(dx)) {
+      clearLongPressTimer();
+      chartPan = null;
+      return;
+    }
     if (chartPan.moved || Math.hypot(dx, dy) > 5) {
       chartPan.moved = true;
       clearLongPressTimer();
       event.preventDefault();
       chartPan.chart.scrollLeft = chartPan.scrollLeft - dx;
-      chartPan.chart.scrollTop = chartPan.scrollTop - dy;
       syncChartScrollTrack(chartPan.chart);
     }
     return;
@@ -819,16 +823,6 @@ document.addEventListener("pointercancel", finishChartResize);
 document.addEventListener("scroll", (event) => {
   if (event.target.matches?.(".chart-wrap")) syncChartScrollTrack(event.target);
 }, true);
-
-document.addEventListener("wheel", (event) => {
-  const chart = event.target.closest?.(".chart-wrap");
-  if (!chart) return;
-  const canScrollX = chart.scrollWidth > chart.clientWidth;
-  if (!canScrollX || Math.abs(event.deltaX) >= Math.abs(event.deltaY)) return;
-  event.preventDefault();
-  chart.scrollLeft += event.deltaY;
-  syncChartScrollTrack(chart);
-}, { passive: false });
 
 document.addEventListener("change", (event) => {
   if (event.target.matches("[name='rowId']")) {
