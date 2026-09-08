@@ -186,7 +186,7 @@ button {
 }
 
 .phone-app {
-  min-height: 100vh;
+  min-height: 100dvh;
   padding-bottom: 86px;
 }
 
@@ -1964,6 +1964,10 @@ button {
   gap: 6px;
 }
 
+.quick-entry-presets {
+  align-content: start;
+}
+
 .entry-presets button {
   min-height: 34px;
   border-radius: 8px;
@@ -3396,11 +3400,11 @@ button {
     border-radius: 0;
     padding: max(8px, env(safe-area-inset-top)) max(10px, env(safe-area-inset-right)) max(8px, env(safe-area-inset-bottom)) max(10px, env(safe-area-inset-left));
     overflow-x: auto;
-    overflow-y: hidden;
+    overflow-y: auto;
     background: #f8fafc;
     box-shadow: none;
     overscroll-behavior: contain;
-    touch-action: pan-x;
+    touch-action: pan-x pan-y;
   }
 
   .quick-launcher {
@@ -3460,9 +3464,15 @@ button {
     background: #ffffff;
   }
 
+  .quick-entry-presets {
+    grid-column: 1;
+    grid-row: 3;
+    min-width: 164px;
+  }
+
   .quick-panel .keypad {
     grid-column: 2;
-    grid-row: 2;
+    grid-row: 2 / 4;
     align-self: stretch;
     min-width: 210px;
     height: 100%;
@@ -3535,6 +3545,11 @@ button {
   }
 
   .quick-fields {
+    grid-column: 1;
+    grid-row: auto;
+  }
+
+  .quick-entry-presets {
     grid-column: 1;
     grid-row: auto;
   }
@@ -4051,7 +4066,7 @@ button {
     inset: 0;
     z-index: 30;
     grid-template-columns: minmax(166px, 0.72fr) minmax(240px, 1.28fr);
-    grid-template-rows: auto minmax(0, 1fr);
+    grid-template-rows: auto minmax(0, 1fr) auto;
     align-content: stretch;
     gap: 8px;
     width: 100dvw;
@@ -4061,9 +4076,11 @@ button {
     border-radius: 0;
     padding: max(7px, env(safe-area-inset-top)) max(8px, env(safe-area-inset-right)) max(7px, env(safe-area-inset-bottom)) max(8px, env(safe-area-inset-left));
     overflow-x: auto;
-    overflow-y: hidden;
+    overflow-y: auto;
     background: #f8fafc;
     box-shadow: none;
+    overscroll-behavior: contain;
+    touch-action: pan-x pan-y;
   }
 
   .quick-launcher {
@@ -4082,9 +4099,14 @@ button {
     grid-row: 2;
   }
 
+  .quick-entry-presets {
+    grid-column: 1;
+    grid-row: 3;
+  }
+
   .quick-panel .keypad {
     grid-column: 2;
-    grid-row: 2;
+    grid-row: 2 / 4;
     height: 100%;
   }
 

@@ -21,8 +21,8 @@ const rows = [
   { id: "feces", label: "Feces", tone: "output", quick: true, placeholder: "예: 정상(소량)" },
   { id: "urine", label: "Urine", tone: "output", quick: true, placeholder: "예: 정상뇨(혼탁)" },
   { id: "diet", label: "식이 급여 샘플", tone: "feed", quick: true, placeholder: "예: 1/2" },
-  { id: "water", label: "수액 처치 샘플", tone: "fluid", quick: false, placeholder: "예: FRI" },
-  { id: "cerenia", label: "주사 처치 A", tone: "med", quick: false, placeholder: "예: ✓" },
+  { id: "water", label: "수액 처치 샘플", tone: "fluid", quick: true, placeholder: "예: FRI" },
+  { id: "cerenia", label: "주사 처치 A", tone: "med", quick: true, placeholder: "예: ✓" },
   { id: "nac", label: "주사 처치 B", tone: "med", quick: false, placeholder: "예: ✓" },
   { id: "meto", label: "주사 처치 C", tone: "med", quick: false, placeholder: "예: ✓" },
   { id: "mero", label: "주사 처치 D", tone: "med", quick: false, placeholder: "예: ✓" },
@@ -31,7 +31,7 @@ const rows = [
   { id: "pain", label: "내복 처치 C", tone: "care", quick: false, placeholder: "예: ✓" },
   { id: "urinary", label: "압박배뇨", tone: "care", quick: true, placeholder: "예: ✓" },
   { id: "twitching", label: "**Twitching 확인: Y/N", tone: "check", quick: true, placeholder: "예: N" },
-  { id: "guardian", label: "보호자채널전송", tone: "check", quick: false, placeholder: "예: 전송" }
+  { id: "guardian", label: "보호자채널전송", tone: "check", quick: true, placeholder: "예: 전송" }
 ];
 
 const seedPatients = [
@@ -587,6 +587,16 @@ document.addEventListener("click", (event) => {
     const input = document.querySelector("[name='value']");
     if (!input) return;
     input.value = `${input.value}${action.dataset.value === "dot" ? "." : action.dataset.value}`;
+    syncClearableField(input);
+    input.focus();
+    return;
+  }
+
+  if (action.dataset.action === "entry-preset") {
+    const input = document.querySelector(".quick-panel [name='value'], .quick-entry-card [name='value']");
+    if (!input) return;
+    const value = action.dataset.value || "";
+    input.value = input.value ? `${input.value} / ${value}` : value;
     syncClearableField(input);
     input.focus();
     return;
@@ -1477,6 +1487,9 @@ function openChartDetail(patientId, options = {}) {
   state.chartDetailOpen = true;
   state.quickOpen = false;
   state.entryPanelOpen = false;
+  document.documentElement.classList.remove("entry-panel-locked");
+  document.body.classList.remove("entry-panel-locked");
+  requestAnimationFrame(() => window.scrollTo({ top: 0, left: 0, behavior: "auto" }));
   const nextHash = chartHash(patientId);
   if (window.location.hash === nextHash) return;
   if (options.replace) {
@@ -2365,7 +2378,6 @@ function renderQuickInput(patient) {
         </div>
         <div class="quick-head-actions">
           <button type="button" data-action="clear-cell">초기화</button>
-          <button class="close-quick" type="button" data-action="close-entry" aria-label="등록 패널 닫기">×</button>
         </div>
       </div>
       ${state.entrySaveNotice ? `<p class="entry-save-notice">${state.entrySaveNotice}</p>` : ""}
@@ -2387,6 +2399,7 @@ function renderQuickInput(patient) {
           ${clearableControl(`<input name="staff" value="${escapeAttr(patient.doctor)}" />`, patient.doctor)}
         </label>
       </div>
+      ${renderEntryPresets(row.id)}
       ${showKeypad ? renderQuickKeypad() : ""}
       <button class="quick-save-wide" type="submit">기록 저장</button>
     </form>
@@ -2717,15 +2730,28 @@ function presetsForRow(rowId) {
     bp: [],
     pulse: [],
     resp: [["P(헐떡임)", "P"], ["SRR(숙면중 호흡수)", "SRR"]],
-    vomit: [["구토 없음", "구토 없음"], ["거품토", "거품토"], ["사료토", "사료토"]],
+    vomit: [["구토 없음", "구토 없음"], ["구토 1회", "구토 1회"], ["거품토", "거품토"], ["사료토", "사료토"]],
     feces: [["설사", "설사"], ["정상변", "정상변"], ["혈변", "혈변"], ["점액변", "점액변"], ["변비", "변비"]],
-    urine: [["정상뇨", "정상뇨"], ["혈뇨", "혈뇨"], ["활당뇨", "활당뇨"], ["배뇨 없음", "배뇨 없음"]],
+    urine: [["정상뇨", "정상뇨"], ["혈뇨", "혈뇨"], ["황달뇨", "황달뇨"], ["배뇨 없음", "배뇨 없음"]],
     diet: [["강급", "강급"], ["핸드피딩", "핸드피딩"], ["잘먹음", "잘먹음"], ["식욕감소", "식욕감소"]],
-    water: [["수액 유지", "수액 유지"], ["라인", "라인"]],
+    water: [["수액 유지", "수액 유지"], ["라인 확인", "라인 확인"], ["FRI", "FRI"]],
+    cerenia: [["완료", "완료"]],
     urinary: [["압박배뇨 완료", "완료"], ["자발배뇨", "자발배뇨"], ["배뇨 없음", "배뇨 없음"]],
-    guardian: []
+    guardian: [["완료", "완료"]]
   };
   return presetMap[rowId] ?? [["완료", "완료"], ["보류", "보류"]];
+}
+
+function renderEntryPresets(rowId) {
+  const presets = presetsForRow(rowId);
+  if (!presets.length) return "";
+  return `
+    <div class="entry-presets quick-entry-presets" aria-label="빠른 선택">
+      ${presets
+        .map(([value, label]) => `<button type="button" data-action="entry-preset" data-value="${escapeAttr(value)}">${label}</button>`)
+        .join("")}
+    </div>
+  `;
 }
 
 function rowLabel(rowId) {
