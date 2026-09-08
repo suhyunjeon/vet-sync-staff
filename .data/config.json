@@ -6,6 +6,7 @@
   ],
   "patientWards": {},
   "patientStatuses": {
-    "p7770": "discharged"
+    "p7770": "discharged",
+    "p2161": "discharged"
   }
 }
