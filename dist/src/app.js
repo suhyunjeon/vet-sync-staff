@@ -21,7 +21,7 @@ const rows = [
   { id: "feces", label: "Feces", tone: "output", quick: true, placeholder: "예: 정상(소량)" },
   { id: "urine", label: "Urine", tone: "output", quick: true, placeholder: "예: 정상뇨(혼탁)" },
   { id: "diet", label: "식이 급여 샘플", tone: "feed", quick: true, placeholder: "예: 1/2" },
-  { id: "water", label: "수액 처치 샘플", tone: "fluid", quick: false, placeholder: "예: 60ml" },
+  { id: "water", label: "수액 처치 샘플", tone: "fluid", quick: false, placeholder: "예: FRI" },
   { id: "cerenia", label: "주사 처치 A", tone: "med", quick: false, placeholder: "예: ✓" },
   { id: "nac", label: "주사 처치 B", tone: "med", quick: false, placeholder: "예: ✓" },
   { id: "meto", label: "주사 처치 C", tone: "med", quick: false, placeholder: "예: ✓" },
@@ -506,7 +506,6 @@ document.addEventListener("click", (event) => {
     state.entryPanelOpen = true;
     save();
     render();
-    requestAnimationFrame(() => document.querySelector("[name='value']")?.focus());
     return;
   }
 
@@ -541,7 +540,6 @@ document.addEventListener("click", (event) => {
     state.entryPanelOpen = true;
     save();
     render();
-    requestAnimationFrame(() => document.querySelector("[name='value']")?.focus());
     return;
   }
 
@@ -589,16 +587,6 @@ document.addEventListener("click", (event) => {
     const input = document.querySelector("[name='value']");
     if (!input) return;
     input.value = `${input.value}${action.dataset.value === "dot" ? "." : action.dataset.value}`;
-    syncClearableField(input);
-    input.focus();
-    return;
-  }
-
-  if (action.dataset.action === "preset-value") {
-    const input = document.querySelector("[name='value']");
-    if (!input) return;
-    const value = action.dataset.value || "";
-    input.value = input.value ? `${input.value} / ${value}` : value;
     syncClearableField(input);
     input.focus();
     return;
@@ -864,6 +852,21 @@ document.addEventListener("input", (event) => {
     save();
     render();
   }
+});
+
+document.addEventListener("focusin", (event) => {
+  if (!event.target.matches(".quick-panel textarea[name='value']")) return;
+  const panel = event.target.closest(".quick-panel");
+  if (panel?.classList.contains("keypad-ready")) panel.classList.add("keypad-open");
+});
+
+document.addEventListener("focusout", (event) => {
+  if (!event.target.matches(".quick-panel textarea[name='value']")) return;
+  const panel = event.target.closest(".quick-panel");
+  window.setTimeout(() => {
+    if (!panel || panel.contains(document.activeElement)) return;
+    panel.classList.remove("keypad-open");
+  }, 0);
 });
 
 document.addEventListener("submit", (event) => {
@@ -2353,7 +2356,7 @@ function renderQuickInput(patient) {
   const size = getQuickSize();
   const showKeypad = shouldShowKeypad(row.id);
   return `
-    <form class="quick-panel ${showKeypad ? "" : "no-keypad"}" data-form="entry" style="--quick-sheet-height: ${size.sheetHeight}vh">
+    <form class="quick-panel ${showKeypad ? "keypad-ready" : "no-keypad"}" data-form="entry" style="--quick-sheet-height: ${size.sheetHeight}vh">
       <input type="hidden" name="patientId" value="${patient.id}" />
       <div class="quick-head">
         <div>
@@ -2384,13 +2387,8 @@ function renderQuickInput(patient) {
           ${clearableControl(`<input name="staff" value="${escapeAttr(patient.doctor)}" />`, patient.doctor)}
         </label>
       </div>
-      ${renderEntryPresets()}
-      <div class="keypad">
-        ${["1", "2", "3", "4", "5", "6", "7", "8", "9", "dot", "0"]
-          .map((key) => `<button type="button" data-action="append" data-value="${key}">${key === "dot" ? "-/+." : key}</button>`)
-          .join("")}
-        <button class="save" type="submit">기록 저장</button>
-      </div>
+      ${showKeypad ? renderQuickKeypad() : ""}
+      <button class="quick-save-wide" type="submit">기록 저장</button>
     </form>
   `;
 }
@@ -2672,7 +2670,6 @@ function renderQuickScreen(patient) {
           ${clearableControl(`<textarea name="value" placeholder="결과/완료/메모 입력" autocomplete="off" required></textarea>`)}
         </div>
         ${state.entrySaveNotice ? `<p class="entry-save-notice">${state.entrySaveNotice}</p>` : ""}
-        ${renderEntryPresets(row.id)}
         <div class="quick-entry-layout">
           <div class="quick-row-picker">
             ${rows
@@ -2709,16 +2706,6 @@ function renderQuickKeypad() {
   `;
 }
 
-function renderEntryPresets(rowId) {
-  const presets = presetsForRow(rowId);
-  if (!presets.length) return "";
-  return `
-    <div class="entry-presets" aria-label="빠른 기록">
-      ${presets.map(([value, label]) => `<button type="button" data-action="preset-value" data-value="${escapeAttr(value)}">${label}</button>`).join("")}
-    </div>
-  `;
-}
-
 function shouldShowKeypad(rowId) {
   return ["weight", "temp", "bp", "pulse", "resp"].includes(rowId);
 }
@@ -2732,9 +2719,9 @@ function presetsForRow(rowId) {
     resp: [["P(헐떡임)", "P"], ["SRR(숙면중 호흡수)", "SRR"]],
     vomit: [["구토 없음", "구토 없음"], ["거품토", "거품토"], ["사료토", "사료토"]],
     feces: [["설사", "설사"], ["정상변", "정상변"], ["혈변", "혈변"], ["점액변", "점액변"], ["변비", "변비"]],
-    urine: [["정상뇨", "정상뇨"], ["혈뇨", "혈뇨"], ["배뇨 없음", "배뇨 없음"]],
+    urine: [["정상뇨", "정상뇨"], ["혈뇨", "혈뇨"], ["활당뇨", "활당뇨"], ["배뇨 없음", "배뇨 없음"]],
     diet: [["강급", "강급"], ["핸드피딩", "핸드피딩"], ["잘먹음", "잘먹음"], ["식욕감소", "식욕감소"]],
-    water: [["수액 유지", "수액 유지"], ["라인 확인", "라인 확인"]],
+    water: [["수액 유지", "수액 유지"], ["라인", "라인"]],
     urinary: [["압박배뇨 완료", "완료"], ["자발배뇨", "자발배뇨"], ["배뇨 없음", "배뇨 없음"]],
     guardian: []
   };

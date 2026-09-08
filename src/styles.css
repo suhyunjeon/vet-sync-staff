@@ -2108,6 +2108,14 @@ button {
   gap: 8px;
 }
 
+.quick-panel.keypad-ready:not(.keypad-open) .keypad {
+  display: none;
+}
+
+.quick-panel.keypad-ready.keypad-open .quick-save-wide {
+  display: none;
+}
+
 .keypad button {
   min-height: 44px;
   border-radius: 8px;
