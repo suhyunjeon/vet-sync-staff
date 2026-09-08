@@ -1492,11 +1492,7 @@ function openChartDetail(patientId, options = {}) {
   requestAnimationFrame(() => window.scrollTo({ top: 0, left: 0, behavior: "auto" }));
   const nextHash = chartHash(patientId);
   if (window.location.hash === nextHash) return;
-  if (options.replace) {
-    window.history.replaceState({ chartDetailOpen: true }, "", nextHash);
-    return;
-  }
-  window.history.pushState({ chartDetailOpen: true }, "", nextHash);
+  window.history.replaceState({ chartDetailOpen: true }, "", nextHash);
 }
 
 function showChartList() {
@@ -1582,7 +1578,7 @@ function renderApp() {
       <header class="app-header">
         ${
           isChartDetail
-            ? `<button class="icon-button" data-action="chart-back" aria-label="환자 목록으로 돌아가기">‹</button>`
+            ? `<button class="icon-button" type="button" data-action="chart-back" aria-label="환자 목록으로 돌아가기">‹</button>`
             : `<span class="header-spacer" aria-hidden="true"></span>`
         }
         <div class="date-switcher">
