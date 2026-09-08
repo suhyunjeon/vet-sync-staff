@@ -2146,8 +2146,8 @@ function renderPatientAvatar(patient, variant = "card") {
 }
 
 function defaultPatientPhotoUrl(patient) {
-  if (patient.species === "개") return "/assets/default-dog.png";
-  if (patient.species === "고양이") return "/assets/default-cat.png";
+  if (patient.species === "개") return "assets/default-dog.png";
+  if (patient.species === "고양이") return "assets/default-cat.png";
   return "";
 }
 
