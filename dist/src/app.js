@@ -1507,13 +1507,17 @@ function closeChartRoute() {
 }
 
 function render() {
+  reconcileSelectedPatient();
   app.innerHTML = state.authed
     ? `${renderApp()}${state.calendarOpen ? renderCalendarSheet() : ""}${state.helpOpen ? renderHelpBubble() : ""}`
     : renderLogin();
   syncScrollLock();
   syncBpmTicker();
   syncRealtimeConnection();
-  requestAnimationFrame(syncChartScrollTracks);
+  requestAnimationFrame(() => {
+    focusCurrentChartSlot();
+    syncChartScrollTracks();
+  });
 }
 
 function syncScrollLock() {
@@ -3138,7 +3142,23 @@ function compactDate(value) {
 }
 
 function activePatient() {
+  if (state.section === "tasks") {
+    const patientsInScope = filteredPatients();
+    return patientsInScope.find((patient) => patient.id === state.patientId) || patientsInScope[0] || patients[0];
+  }
   return patients.find((patient) => patient.id === state.patientId) || patients[0];
+}
+
+function reconcileSelectedPatient() {
+  if (!patients.length) return;
+  if (state.section !== "tasks") {
+    if (!patients.some((patient) => patient.id === state.patientId)) state.patientId = patients[0].id;
+    return;
+  }
+  const patientsInScope = filteredPatients();
+  if (patientsInScope.length && !patientsInScope.some((patient) => patient.id === state.patientId)) {
+    state.patientId = patientsInScope[0].id;
+  }
 }
 
 function buildPatientFromForm(data, existingPatient = null) {
@@ -3719,6 +3739,18 @@ function syncChartScrollTrack(chart) {
 
 function syncChartScrollTracks() {
   document.querySelectorAll(".chart-wrap").forEach(syncChartScrollTrack);
+}
+
+function focusCurrentChartSlot() {
+  if (!state.authed || !state.chartDetailOpen || state.entryPanelOpen) return;
+  document.querySelectorAll(".chart-wrap").forEach((chart) => {
+    if (chart.dataset.focusedDate === selectedDateKey()) return;
+    const currentCell = chart.querySelector("th.now, td.now");
+    if (!currentCell) return;
+    const targetLeft = currentCell.offsetLeft - chart.clientWidth * 0.48;
+    chart.scrollLeft = Math.max(0, targetLeft);
+    chart.dataset.focusedDate = selectedDateKey();
+  });
 }
 
 function clampLabelSize(value) {
