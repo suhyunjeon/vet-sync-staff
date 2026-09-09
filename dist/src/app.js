@@ -3,6 +3,8 @@ import { seedPatients } from "./seed-patients.js";
 const STORAGE_KEY = "vetcrew-staff-state-v1";
 const CLIENT_ID_KEY = "vetcrew-staff-client-id";
 const TUTORIAL_SEEN_KEY = "vetcrew-staff-tutorial-seen";
+const ENTRY_PHOTO_MAX_EDGE = 1200;
+const ENTRY_PHOTO_QUALITY = 0.72;
 const now = new Date();
 const currentHour = now.getHours();
 const currentMinute = now.getMinutes();
@@ -32,7 +34,6 @@ const rows = [
   { id: "laminase", label: "내복 처치 B", tone: "care", quick: false, placeholder: "예: ✓" },
   { id: "pain", label: "내복 처치 C", tone: "care", quick: false, placeholder: "예: ✓" },
   { id: "urinary", label: "압박배뇨", tone: "care", quick: true, placeholder: "예: ✓" },
-  { id: "twitching", label: "**Twitching 확인: Y/N", tone: "check", quick: true, placeholder: "예: N" },
   { id: "guardian", label: "보호자채널전송", tone: "check", quick: true, placeholder: "예: 전송" }
 ];
 
@@ -47,15 +48,13 @@ const seedEntries = [
   entry("p7770", "urine", 1, "정상뇨", "데모수의사A"),
   entry("p7770", "nac", 5, "✓", "데모수의사A"),
   entry("p7770", "urinary", 1, "✓", "데모수의사A"),
-  entry("p7770", "twitching", 1, "N", "데모수의사A"),
-  entry("p7770", "twitching", 3, "N", "데모수의사A"),
   entry("p2161", "bp", 3, "130", "데모수의사B"),
   entry("p2161", "resp", 3, "24", "데모수의사B"),
   entry("p2161", "feces", 3, "정상", "데모수의사B"),
+  { ...entry("p5947", "vomit", 20, "구토 1회", "데모수의사C"), photoAsset: "assets/vomit-sample.jpeg" },
   entry("p2161", "diet", 5, "1", "데모수의사B"),
   entry("p2161", "mero", 3, "✓", "데모수의사B"),
-  entry("p2161", "appetite", 3, "✓", "데모수의사B"),
-  entry("p2161", "twitching", 3, "N", "데모수의사B")
+  entry("p2161", "appetite", 3, "✓", "데모수의사B")
 ];
 
 const navItems = [
@@ -70,7 +69,7 @@ const helpSteps = [
     section: "chart",
     title: "차트",
     text: "환자 목록에서 입원 환자를 찾고, 상세 차트에서 시간대별 기록을 남깁니다.",
-    tips: ["검색/필터로 환자를 찾습니다.", "환자 카드를 누르면 상세 차트가 열립니다.", "셀을 누르면 기록 입력, 측정 셀은 길게 눌러 BPM 측정으로 이동합니다."]
+    tips: ["검색/필터로 환자를 찾습니다.", "환자 카드를 누르면 상세 차트가 열립니다.", "셀을 누르면 바로 기록 입력 화면으로 이동합니다."]
   },
   {
     section: "tasks",
@@ -104,6 +103,8 @@ const clientId = loadClientId();
 let chartResize = null;
 let chartPan = null;
 let chartTrackDrag = null;
+let cellTap = null;
+let measureHold = null;
 let bpmTicker = null;
 let longPressTimer = null;
 let suppressClickUntil = 0;
@@ -439,6 +440,18 @@ document.addEventListener("click", (event) => {
   }
 
   if (action.dataset.action === "close-quick" || action.dataset.action === "close-entry") {
+    if (action.dataset.action === "close-entry" && state.chartDetailOpen) {
+      state.chartFocus = {
+        patientId: state.patientId,
+        rowId: state.rowId,
+        hour: state.hour,
+        dateKey: selectedDateKey()
+      };
+      const nextHash = chartHash(state.patientId);
+      if (window.location.hash !== nextHash) {
+        window.history.replaceState({ chartDetailOpen: true }, "", nextHash);
+      }
+    }
     state.quickOpen = false;
     state.entryPanelOpen = false;
     save();
@@ -462,13 +475,13 @@ document.addEventListener("click", (event) => {
     return;
   }
 
+  if (action.dataset.action === "open-measure") {
+    openMeasureFromChart(action);
+    return;
+  }
+
   if (action.dataset.action === "select-cell") {
-    openChartDetail(action.dataset.patientId, { replace: true });
-    state.rowId = action.dataset.rowId;
-    state.hour = Number(action.dataset.hour);
-    state.entryPanelOpen = true;
-    save();
-    render();
+    openEntryFromCell(action);
     return;
   }
 
@@ -596,6 +609,11 @@ document.addEventListener("click", (event) => {
     return;
   }
 
+  if (action.dataset.action === "return-chart-point") {
+    returnToChartPoint(action);
+    return;
+  }
+
   if (action.dataset.action === "save-bpm-result") {
     const measure = currentBpmMeasure();
     if (measure.result === null) return;
@@ -636,9 +654,46 @@ document.addEventListener("click", (event) => {
   }
 });
 
+document.addEventListener("click", (event) => {
+  const target = event.target.closest("[data-action='return-chart-point']");
+  if (!target) return;
+  event.preventDefault();
+  event.stopPropagation();
+  returnToChartPoint(target);
+}, true);
+
 document.addEventListener("pointerdown", (event) => {
+  const cellTarget = event.target.closest("[data-action='select-cell']");
+  if (cellTarget) {
+    const measureTarget = cellTarget.matches("[data-measure-row]") ? cellTarget : null;
+    cellTap = {
+      pointerId: event.pointerId,
+      target: cellTarget,
+      measureTarget,
+      startX: event.clientX,
+      startY: event.clientY,
+      moved: false
+    };
+    if (measureTarget) {
+      startMeasureHold(measureTarget, event.pointerId, event.clientX, event.clientY);
+    }
+  }
+
+  const measureRowTarget = event.target.closest(".row-label[data-measure-row]");
+  if (measureRowTarget && !cellTarget) {
+    cellTap = {
+      pointerId: event.pointerId,
+      target: null,
+      measureTarget: measureRowTarget,
+      startX: event.clientX,
+      startY: event.clientY,
+      moved: false
+    };
+    startMeasureHold(measureRowTarget, event.pointerId, event.clientX, event.clientY);
+  }
+
   const chartWrap = event.target.closest(".chart-wrap");
-  if (chartWrap && !event.target.closest("[data-resize='label-width']")) {
+  if (chartWrap && !event.target.closest("[data-resize='label-width'], [data-action='select-cell'], [data-measure-row]")) {
     chartPan = {
       pointerId: event.pointerId,
       chart: chartWrap,
@@ -649,27 +704,6 @@ document.addEventListener("pointerdown", (event) => {
       moved: false
     };
     chartWrap.setPointerCapture?.(event.pointerId);
-  }
-
-  const cellTarget = event.target.closest("[data-action='select-cell']");
-  if (cellTarget) {
-    const measureTarget = cellTarget.matches("[data-measure-row]") ? cellTarget : null;
-    longPressTimer = setTimeout(() => {
-      if (measureTarget) {
-        openMeasureFromChart(measureTarget);
-      } else {
-        openEntryFromCell(cellTarget);
-      }
-      longPressTimer = null;
-    }, measureTarget ? 520 : 420);
-  }
-
-  const measureTarget = event.target.closest("[data-measure-row]");
-  if (measureTarget && !cellTarget) {
-    longPressTimer = setTimeout(() => {
-      openMeasureFromChart(measureTarget);
-      longPressTimer = null;
-    }, 520);
   }
 
   const scrollTrack = event.target.closest(".scroll-track");
@@ -702,22 +736,27 @@ document.addEventListener("pointerdown", (event) => {
   handle.setPointerCapture?.(event.pointerId);
 });
 
-document.addEventListener("pointermove", () => {
-  if (!chartPan && !chartTrackDrag) clearLongPressTimer();
-});
-
 document.addEventListener("pointermove", (event) => {
+  if (cellTap && event.pointerId === cellTap.pointerId) {
+    const dx = event.clientX - cellTap.startX;
+    const dy = event.clientY - cellTap.startY;
+    if (Math.hypot(dx, dy) > 8) {
+      cellTap.moved = true;
+      clearLongPressTimer();
+    }
+  }
+
+  moveMeasureHold(event.pointerId, event.clientX, event.clientY);
+
   if (chartPan && event.pointerId === chartPan.pointerId) {
     const dx = event.clientX - chartPan.startX;
     const dy = event.clientY - chartPan.startY;
     if (!chartPan.moved && Math.abs(dy) > 5 && Math.abs(dy) > Math.abs(dx)) {
-      clearLongPressTimer();
       chartPan = null;
       return;
     }
     if (chartPan.moved || Math.hypot(dx, dy) > 5) {
       chartPan.moved = true;
-      clearLongPressTimer();
       event.preventDefault();
       chartPan.chart.scrollLeft = chartPan.scrollLeft - dx;
       syncChartScrollTrack(chartPan.chart);
@@ -742,10 +781,36 @@ document.addEventListener("pointermove", (event) => {
   chartResize.chart?.style.setProperty("--label-width", `${width}px`);
 });
 
+document.addEventListener("contextmenu", (event) => {
+  const target = event.target.closest("[data-measure-row]");
+  if (!target) return;
+  event.preventDefault();
+  cellTap = null;
+  clearLongPressTimer();
+  openMeasureFromChart(target);
+});
+
+document.addEventListener("pointerup", (event) => {
+  const target = event.target.closest("[data-action='open-measure']");
+  if (!target) return;
+  event.preventDefault();
+  cellTap = null;
+  clearLongPressTimer();
+  openMeasureFromChart(target);
+});
+document.addEventListener("pointerup", (event) => {
+  const target = event.target.closest("[data-action='return-chart-point']");
+  if (!target) return;
+  event.preventDefault();
+  returnToChartPoint(target);
+});
 document.addEventListener("pointerup", finishChartPan);
 document.addEventListener("pointercancel", finishChartPan);
 document.addEventListener("pointerup", finishChartResize);
 document.addEventListener("pointercancel", finishChartResize);
+document.addEventListener("pointerup", finishCellTap);
+document.addEventListener("pointercancel", cancelCellTap);
+document.addEventListener("pointerup", (event) => cancelMeasureHold(event.pointerId));
 
 document.addEventListener("scroll", (event) => {
   if (event.target.matches?.(".chart-wrap")) syncChartScrollTrack(event.target);
@@ -870,7 +935,7 @@ document.addEventListener("focusout", (event) => {
   }, 0);
 });
 
-document.addEventListener("submit", (event) => {
+document.addEventListener("submit", async (event) => {
   const wardForm = event.target.closest("form[data-form='ward-location']");
   if (wardForm) {
     event.preventDefault();
@@ -984,20 +1049,34 @@ document.addEventListener("submit", (event) => {
   if (!form) return;
   event.preventDefault();
   const data = new FormData(form);
+  const patientId = String(data.get("patientId"));
+  const rowId = String(data.get("rowId"));
+  const hour = Number(data.get("hour"));
   const value = String(data.get("value") || "").trim();
-  if (!value) return;
+  const photoDataUrl = rowId === "vomit" ? await readEntryPhotoFile(data.get("photoFile")) : "";
+  const dateKey = selectedDateKey();
+  const existingEntry = state.entries.find(
+    (item) =>
+      item.patientId === patientId &&
+      item.rowId === rowId &&
+      item.hour === hour &&
+      entryDateKey(item) === dateKey
+  );
+  if (!value && !photoDataUrl && !entryPhotoSrc(existingEntry)) return;
 
   const next = {
     id: `e_${Date.now()}`,
-    patientId: String(data.get("patientId")),
-    rowId: String(data.get("rowId")),
-    hour: Number(data.get("hour")),
-    value,
+    patientId,
+    rowId,
+    hour,
+    value: value || "사진 첨부",
     staff: String(data.get("staff") || "").trim() || activePatient().doctor,
-    dateKey: selectedDateKey(),
+    dateKey,
     writtenAt: new Date().toISOString()
   };
-  const dateKey = selectedDateKey();
+  if (photoDataUrl) next.photoDataUrl = photoDataUrl;
+  if (!photoDataUrl && existingEntry?.photoDataUrl) next.photoDataUrl = existingEntry.photoDataUrl;
+  if (!photoDataUrl && existingEntry?.photoAsset) next.photoAsset = existingEntry.photoAsset;
   state.entries = state.entries.filter(
     (item) =>
       !(
@@ -1014,7 +1093,14 @@ document.addEventListener("submit", (event) => {
   state.entrySaveNotice = `${rowLabel(next.rowId)} · ${formatTimeLabel(next.hour)} 기록 저장`;
   state.quickOpen = false;
   if (form.classList.contains("quick-panel")) {
+    state.chartFocus = {
+      patientId: next.patientId,
+      rowId: next.rowId,
+      hour: next.hour,
+      dateKey
+    };
     openChartDetail(next.patientId, { replace: true });
+    window.history.replaceState({ chartDetailOpen: true }, "", chartHash(next.patientId));
   }
   save();
   syncUpsertEntry(next);
@@ -1142,7 +1228,24 @@ function loadState() {
 }
 
 function save() {
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+  try {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(stateForStorage()));
+  } catch {
+    // The realtime/local server remains the source for large synced payloads.
+  }
+}
+
+function stateForStorage() {
+  return {
+    ...state,
+    entries: Array.isArray(state.entries) ? state.entries.map(entryForStorage) : []
+  };
+}
+
+function entryForStorage(item) {
+  if (!item || typeof item !== "object" || !item.photoDataUrl) return item;
+  const { photoDataUrl, ...storedEntry } = item;
+  return storedEntry;
 }
 
 function loadClientId() {
@@ -1188,6 +1291,41 @@ function syncDeleteEntry(target) {
 
 function syncBatchEntries(deletes, entries) {
   postJson("/api/entries/batch", { clientId, deletes, entries });
+}
+
+function readEntryPhotoFile(file) {
+  if (!file || typeof file !== "object" || !file.size) return Promise.resolve("");
+  if (!String(file.type || "").startsWith("image/")) return Promise.resolve("");
+  return new Promise((resolve) => {
+    const reader = new FileReader();
+    reader.onload = () => resizeEntryPhoto(String(reader.result || "")).then(resolve);
+    reader.onerror = () => resolve("");
+    reader.readAsDataURL(file);
+  });
+}
+
+function resizeEntryPhoto(dataUrl) {
+  if (!dataUrl) return Promise.resolve("");
+  return new Promise((resolve) => {
+    const image = new Image();
+    image.onload = () => {
+      const scale = Math.min(1, ENTRY_PHOTO_MAX_EDGE / Math.max(image.naturalWidth, image.naturalHeight));
+      const width = Math.max(1, Math.round(image.naturalWidth * scale));
+      const height = Math.max(1, Math.round(image.naturalHeight * scale));
+      const canvas = document.createElement("canvas");
+      canvas.width = width;
+      canvas.height = height;
+      const context = canvas.getContext("2d");
+      if (!context) {
+        resolve(dataUrl);
+        return;
+      }
+      context.drawImage(image, 0, 0, width, height);
+      resolve(canvas.toDataURL("image/jpeg", ENTRY_PHOTO_QUALITY));
+    };
+    image.onerror = () => resolve("");
+    image.src = dataUrl;
+  });
 }
 
 function syncConfig() {
@@ -1437,22 +1575,47 @@ function chartHash(patientId) {
   return `#chart-${patientId}`;
 }
 
-function patientIdFromChartHash() {
-  const match = window.location.hash.match(/^#chart-(.+)$/);
+function chartPointHash(patientId, rowId, hour) {
+  return `${chartHash(patientId)}/${rowId}/${hour}`;
+}
+
+function chartRouteFromHash() {
+  const match = window.location.hash.match(/^#chart-([^/]+)(?:\/([^/]+)\/([^/]+))?$/);
   if (!match) return "";
   const patientId = decodeURIComponent(match[1]);
-  return patients.some((patient) => patient.id === patientId) ? patientId : "";
+  if (!patients.some((patient) => patient.id === patientId)) return null;
+  return {
+    patientId,
+    rowId: match[2] ? decodeURIComponent(match[2]) : "",
+    hour: match[3] !== undefined ? Number(decodeURIComponent(match[3])) : null
+  };
+}
+
+function patientIdFromChartHash() {
+  return chartRouteFromHash()?.patientId || "";
 }
 
 function applyRouteFromHash() {
-  const patientId = patientIdFromChartHash();
-  if (patientId) {
+  const route = chartRouteFromHash();
+  if (route?.patientId) {
     state.section = "chart";
     state.view = "chart";
-    state.patientId = patientId;
+    state.patientId = route.patientId;
     state.chartDetailOpen = true;
     state.quickOpen = false;
     state.entryPanelOpen = false;
+    if (route.rowId && Number.isFinite(route.hour)) {
+      ensureEntryPanelHistory(route);
+      state.rowId = route.rowId;
+      state.hour = route.hour;
+      state.entryPanelOpen = true;
+      state.chartFocus = {
+        patientId: route.patientId,
+        rowId: route.rowId,
+        hour: route.hour,
+        dateKey: selectedDateKey()
+      };
+    }
     return;
   }
   if (state.section === "chart") {
@@ -1515,9 +1678,15 @@ function render() {
   syncBpmTicker();
   syncRealtimeConnection();
   requestAnimationFrame(() => {
+    requestAnimationFrame(() => {
+      focusCurrentChartSlot();
+      syncChartScrollTracks();
+    });
+  });
+  setTimeout(() => {
     focusCurrentChartSlot();
     syncChartScrollTracks();
-  });
+  }, 80);
 }
 
 function syncScrollLock() {
@@ -1561,7 +1730,7 @@ function renderTutorialModal() {
         </header>
         <ul>
           <li>환자 목록에서 환자를 선택하면 시간대별 차트를 볼 수 있습니다.</li>
-          <li>차트 셀을 누르면 기록 패널이 열리고, 길게 누르면 빠른 측정으로 이동합니다.</li>
+          <li>차트 셀을 누르면 기록 입력 화면으로 바로 이동합니다.</li>
           <li>환자 등록 버튼으로 새 입원 환자를 추가할 수 있습니다.</li>
         </ul>
         <button class="primary-action" type="button" data-action="close-tutorial">확인</button>
@@ -1908,7 +2077,7 @@ function renderShiftSummary(patient) {
   return `
     <section class="shift-summary" aria-label="선택 환자 요약">
       <div>
-        <span>선택 환자</span>
+        <span>현재 환자</span>
         <strong>#${patient.chartNo} ${patient.name}</strong>
       </div>
       <div>
@@ -1916,11 +2085,11 @@ function renderShiftSummary(patient) {
         <strong>${vitals}</strong>
       </div>
       <div>
-        <span>차트 기록</span>
+        <span>오늘 기록</span>
         <strong>${doneCount}건</strong>
       </div>
       <div>
-        <span>입력 위치</span>
+        <span>선택 칸</span>
         <strong>${row.label} · ${state.hour}시</strong>
       </div>
     </section>
@@ -2155,27 +2324,51 @@ function renderPatientHandoffPanel(patient) {
 }
 
 function renderVitalTrendPanel(patient) {
-  const points = vitalTrendPoints(patient.id);
+  const chart = vitalTrendChart(patient.id);
   return `
     <article class="clinical-panel vital-trend-panel">
       <header>
         <span>Vitals</span>
         <strong>바이탈 그래프</strong>
       </header>
-      <div class="vital-bars">
-        ${points
+      ${chart ? renderVitalLineChart(chart) : `<p class="clinical-empty">바이탈 기록을 입력하면 추이가 표시됩니다.</p>`}
+    </article>
+  `;
+}
+
+function renderVitalLineChart(chart) {
+  return `
+    <div class="vital-line-chart">
+      <svg viewBox="0 0 320 150" role="img" aria-label="바이탈 최근 추이">
+        <g class="vital-grid">
+          <line x1="34" y1="24" x2="300" y2="24"></line>
+          <line x1="34" y1="68" x2="300" y2="68"></line>
+          <line x1="34" y1="112" x2="300" y2="112"></line>
+        </g>
+        ${chart.yAxis.map((tick) => `<text class="vital-y-axis" x="26" y="${tick.y + 4}">${tick.label}</text>`).join("")}
+        ${chart.labels.map((label) => `<text class="vital-axis" x="${label.x}" y="138">${label.text}</text>`).join("")}
+        ${chart.series
           .map(
-            (point) => `
-              <div>
-                <span style="--bar-height: ${point.percent}%"></span>
-                <small>${formatTimeLabel(point.hour)}</small>
-              </div>
+            (series) => `
+              <polyline class="vital-line" style="--series-color: ${series.color}" points="${series.points}"></polyline>
+              ${series.dots.map((dot) => `<circle class="vital-dot" style="--series-color: ${series.color}" cx="${dot.x}" cy="${dot.y}" r="3.5"></circle>`).join("")}
+            `
+          )
+          .join("")}
+      </svg>
+      <div class="vital-legend">
+        ${chart.series
+          .map(
+            (series) => `
+              <span>
+                <i style="--series-color: ${series.color}"></i>
+                ${series.label} ${series.latest}
+              </span>
             `
           )
           .join("")}
       </div>
-      <p>${points.length ? "혈압 기준 최근 추이" : "혈압 기록을 입력하면 추이가 표시됩니다."}</p>
-    </article>
+    </div>
   `;
 }
 
@@ -2336,15 +2529,25 @@ function renderChart(patient) {
               .map(
                 (row) => `
                   <tr>
-                    <th class="row-label ${row.tone}" ${measureModeForRow(row.id) ? `data-measure-row="${row.id}" data-patient-id="${patient.id}" data-hour="${current}"` : ""}>${row.label}</th>
+                    <th class="row-label ${row.tone}">${renderChartRowLabel(row, patient, current)}</th>
                     ${chartHours
                       .map((hour) => {
                         const item = entries.find((entryItem) => entryItem.rowId === row.id && entryItem.hour === hour);
                         const cellOrders = patientOrders.filter((order) => order.row.id === row.id && order.hour === hour);
                         const selected = patient.id === state.patientId && row.id === state.rowId && hour === state.hour;
+                        const hasPhoto = Boolean(entryPhotoSrc(item));
+                        const cellClass = [
+                          "cell",
+                          item || cellOrders.length ? "filled" : "",
+                          hasPhoto ? "has-photo" : "",
+                          row.id === "vomit" && hasPhoto ? "vomit-photo-cell" : "",
+                          selected ? "selected" : ""
+                        ]
+                          .filter(Boolean)
+                          .join(" ");
                         return `
                           <td class="${hour === current ? "now" : ""}">
-                            <button class="cell ${item || cellOrders.length ? "filled" : ""} ${selected ? "selected" : ""}" data-action="select-cell" data-patient-id="${patient.id}" data-row-id="${row.id}" data-hour="${hour}" ${measureModeForRow(row.id) ? `data-measure-row="${row.id}"` : ""} aria-label="${row.label} ${formatTimeLabel(hour)}">
+                            <button class="${cellClass}" data-action="select-cell" data-patient-id="${patient.id}" data-row-id="${row.id}" data-hour="${hour}" aria-label="${row.label} ${formatTimeLabel(hour)}">
                               ${item ? `<strong>${item.value}</strong><small>${item.staff}</small>` : ""}
                               ${cellOrders.map((order) => `<em class="cell-order">${escapeAttr(order.title)}</em>`).join("")}
                             </button>
@@ -2364,6 +2567,67 @@ function renderChart(patient) {
   `;
 }
 
+function renderChartRowLabel(row, patient, hour) {
+  const mode = measureModeForRow(row.id);
+  if (!mode) return row.label;
+  const icon = mode === "resp" ? "🫁" : "🫀";
+  const label = mode === "resp" ? "호흡수 측정" : "심박수 측정";
+  return `
+    <span class="row-label-inner">
+      <span>${row.label}</span>
+      <button class="measure-shortcut" type="button" data-action="open-measure" data-measure-row="${row.id}" data-patient-id="${patient.id}" data-hour="${hour}" aria-label="${label}">
+        ${icon}
+      </button>
+    </span>
+  `;
+}
+
+function entryPhotoSrc(item) {
+  return item?.photoDataUrl || item?.photoAsset || "";
+}
+
+function renderEntryPhotoThumb(item) {
+  const src = entryPhotoSrc(item);
+  if (!src) return "";
+  return `<img class="cell-photo-thumb" src="${escapeAttr(src)}" alt="" loading="lazy" />`;
+}
+
+function renderVomitPhotoInputs() {
+  return `
+    <div class="vomit-photo-fields">
+      <label>
+        <span>사진 첨부</span>
+        <input name="photoFile" type="file" accept="image/*" />
+      </label>
+    </div>
+  `;
+}
+
+function renderVomitPhotoGallery(patientId) {
+  const photos = entriesFor(patientId)
+    .filter((item) => item.rowId === "vomit" && entryPhotoSrc(item))
+    .sort((a, b) => Number(a.hour) - Number(b.hour));
+  if (!photos.length) return "";
+  return `
+    <section class="vomit-photo-gallery" aria-label="구토 사진 목록">
+      <strong>구토 사진</strong>
+      <div>
+        ${photos
+          .map((item) => {
+            const src = entryPhotoSrc(item);
+            return `
+              <a href="${escapeAttr(src)}" target="_blank" rel="noreferrer">
+                <img src="${escapeAttr(src)}" alt="${formatTimeLabel(item.hour)} 구토 사진" loading="lazy" />
+                <span>${formatTimeLabel(item.hour)}</span>
+              </a>
+            `;
+          })
+          .join("")}
+      </div>
+    </section>
+  `;
+}
+
 function renderQuickInput(patient) {
   const row = rows.find((item) => item.id === state.rowId) || rows[0];
   const size = getQuickSize();
@@ -2375,7 +2639,7 @@ function renderQuickInput(patient) {
         <button class="quick-back-button" type="button" data-action="close-entry" aria-label="차트로 돌아가기">‹ 차트</button>
         <div>
           <strong>차트 바로 등록</strong>
-          <span>${row.label} · ${formatTimeLabel(state.hour)} · 셀 길게 눌러 열기</span>
+          <span>${row.label} · ${formatTimeLabel(state.hour)} · 셀 선택 입력</span>
         </div>
         <div class="quick-head-actions">
           <button type="button" data-action="clear-cell">초기화</button>
@@ -2393,14 +2657,16 @@ function renderQuickInput(patient) {
         </label>
         <label>
           <span>결과</span>
-          ${clearableControl(`<textarea name="value" placeholder="${row.placeholder} 또는 특이사항 메모" autocomplete="off" required></textarea>`)}
+          ${clearableControl(`<textarea name="value" placeholder="${row.placeholder} 또는 특이사항 메모" autocomplete="off" ${row.id === "vomit" ? "" : "required"}></textarea>`)}
         </label>
+        ${row.id === "vomit" ? renderVomitPhotoInputs() : ""}
         <label>
           <span>작성자</span>
           ${clearableControl(`<input name="staff" value="${escapeAttr(patient.doctor)}" />`, patient.doctor)}
         </label>
       </div>
       ${renderEntryPresets(row.id)}
+      ${row.id === "vomit" ? renderVomitPhotoGallery(patient.id) : ""}
       ${showKeypad ? renderQuickKeypad() : ""}
       <button class="quick-save-wide" type="submit">기록 저장</button>
     </form>
@@ -2649,11 +2915,16 @@ function renderQuickScreen(patient) {
   const modeLabel = state.bpmMode === "resp" ? "호흡수" : "심박수";
   const modeUnit = state.bpmMode === "resp" ? "RPM" : "BPM";
   const row = rows.find((item) => item.id === state.rowId) || rows[0];
+  const showKeypad = shouldShowKeypad(row.id);
+  const targetHour = Number(state.bpmReturn?.hour ?? state.hour ?? currentTimeSlot(chartIntervalForPatient(patient)));
   return `
     <section class="quick-page menu-screen">
       <div class="quick-clock">
         <strong>${periodLabel(currentHour)} ${hour12(currentHour)}</strong>
-        <button class="plain-icon" data-action="open-notifications" aria-label="알림">♢</button>
+        <div class="quick-clock-actions">
+          <a class="bpm-chart-link" href="${chartPointHash(patient.id, row.id, targetHour)}">차트로</a>
+          <button class="plain-icon" data-action="open-notifications" aria-label="알림">♢</button>
+        </div>
       </div>
       <div class="bpm-card">
         <div class="bpm-tabs">
@@ -2681,8 +2952,9 @@ function renderQuickScreen(patient) {
         <input type="hidden" name="hour" value="${currentTimeSlot(chartIntervalForPatient(patient))}" />
         <div class="quick-search">
           <span>▣</span>
-          ${clearableControl(`<textarea name="value" placeholder="결과/완료/메모 입력" autocomplete="off" required></textarea>`)}
+          ${clearableControl(`<textarea name="value" placeholder="결과/완료/메모 입력" autocomplete="off" ${row.id === "vomit" ? "" : "required"}></textarea>`)}
         </div>
+        ${row.id === "vomit" ? renderVomitPhotoInputs() : ""}
         ${state.entrySaveNotice ? `<p class="entry-save-notice">${state.entrySaveNotice}</p>` : ""}
         <div class="quick-entry-layout">
           <div class="quick-row-picker">
@@ -2700,6 +2972,7 @@ function renderQuickScreen(patient) {
           ${showKeypad ? renderQuickKeypad() : `<button class="quick-save-wide" type="submit">기록 저장</button>`}
         </div>
       </form>
+      ${row.id === "vomit" ? renderVomitPhotoGallery(patient.id) : ""}
       <label class="patient-search">
         <input name="search" value="${state.search || ""}" placeholder="환자 선택 / 차트 번호 입력" autocomplete="off" />
         <span>⌕</span>
@@ -2914,15 +3187,15 @@ function renderPlatformCards() {
   return `
     <section class="platform-grid" aria-label="VetCrew 핵심 기능">
       <article>
-        <span>Realtime Access</span>
+        <span>실시간 접속</span>
         <strong>${users.length}명 동시 접속</strong>
       </article>
       <article>
-        <span>Zero Miss</span>
+        <span>누락 방지</span>
         <strong>${summary.todo}건 추적 중</strong>
       </article>
       <article>
-        <span>Flow First</span>
+        <span>빠른 입력</span>
         <strong>빠른입력 1단계</strong>
       </article>
     </section>
@@ -3106,15 +3379,83 @@ function buildClinicalRecordFromForm(data, kind) {
   };
 }
 
-function vitalTrendPoints(patientId) {
+function vitalTrendChart(patientId) {
+  const seriesDefs = [
+    { rowId: "temp", label: "체온", color: "#ef4444", suffix: "°" },
+    { rowId: "bp", label: "혈압", color: "#2563eb", suffix: "" },
+    { rowId: "pulse", label: "심박", color: "#db2777", suffix: "" },
+    { rowId: "resp", label: "호흡", color: "#059669", suffix: "" }
+  ];
+  const series = seriesDefs
+    .map((definition) => vitalSeriesFor(patientId, definition))
+    .filter((item) => item.values.length);
+  if (!series.length) return null;
+  const hoursInSeries = Array.from(new Set(series.flatMap((item) => item.values.map((value) => value.hour)))).sort((a, b) => a - b);
+  const hoursForAxis = hoursInSeries.length === 1 ? [Math.max(0, hoursInSeries[0] - 1), hoursInSeries[0]] : hoursInSeries;
+  const xForHour = (hour) => {
+    const min = hoursForAxis[0];
+    const max = hoursForAxis[hoursForAxis.length - 1];
+    if (min === max) return 167;
+    return 34 + ((hour - min) / (max - min)) * 266;
+  };
+  return {
+    yAxis: vitalBloodPressureAxis(series),
+    labels: hoursInSeries.map((hour) => ({ x: Math.round(xForHour(hour)), text: formatTimeLabel(hour) })),
+    series: series.map((item) => buildVitalSvgSeries(item, xForHour))
+  };
+}
+
+function vitalBloodPressureAxis(series) {
+  const bp = series.find((item) => item.rowId === "bp");
+  if (!bp) return [];
+  const values = bp.values.map((item) => item.value);
+  const rawMin = Math.min(...values);
+  const rawMax = Math.max(...values);
+  const range = rawMax - rawMin || Math.max(rawMax * 0.12, 1);
+  const min = rawMin - range * 0.12;
+  const max = rawMax + range * 0.12;
+  return [max, (max + min) / 2, min].map((value, index) => ({
+    y: [24, 68, 112][index],
+    label: String(Math.round(value))
+  }));
+}
+
+function vitalSeriesFor(patientId, definition) {
   const values = entriesFor(patientId)
-    .filter((item) => item.rowId === "bp")
-    .map((item) => ({ hour: Number(item.hour), value: Number.parseFloat(item.value) }))
+    .filter((item) => item.rowId === definition.rowId)
+    .map((item) => ({ hour: Number(item.hour), value: parseVitalValue(item.value) }))
     .filter((item) => Number.isFinite(item.value))
-    .sort((a, b) => a.hour - b.hour);
-  if (!values.length) return [];
-  const max = Math.max(...values.map((item) => item.value), 1);
-  return values.map((item) => ({ ...item, percent: Math.max(12, Math.round((item.value / max) * 100)) }));
+    .sort((a, b) => a.hour - b.hour)
+    .slice(-8);
+  return { ...definition, values };
+}
+
+function buildVitalSvgSeries(series, xForHour) {
+  const values = series.values;
+  const rawMin = Math.min(...values.map((item) => item.value));
+  const rawMax = Math.max(...values.map((item) => item.value));
+  const range = rawMax - rawMin || Math.max(rawMax * 0.12, 1);
+  const min = rawMin - range * 0.12;
+  const max = rawMax + range * 0.12;
+  const yForValue = (value) => 112 - ((value - min) / (max - min)) * 88;
+  const dots = values.map((item) => ({ x: Math.round(xForHour(item.hour)), y: Math.round(yForValue(item.value)) }));
+  const latest = values[values.length - 1];
+  return {
+    label: series.label,
+    color: series.color,
+    latest: `${formatVitalNumber(latest.value)}${series.suffix}`,
+    dots,
+    points: dots.map((point) => `${point.x},${point.y}`).join(" ")
+  };
+}
+
+function parseVitalValue(value) {
+  const match = String(value || "").match(/\d+(?:\.\d+)?/);
+  return match ? Number.parseFloat(match[0]) : NaN;
+}
+
+function formatVitalNumber(value) {
+  return Number.isInteger(value) ? String(value) : value.toFixed(1);
 }
 
 function compactTimestamp(value) {
@@ -3442,9 +3783,63 @@ function resetBpmMeasure() {
   state.bpmReturn = null;
 }
 
+function openEntryFromCell(target) {
+  const patientId = target.dataset.patientId;
+  const rowId = target.dataset.rowId;
+  const hour = Number(target.dataset.hour);
+  openChartDetail(patientId, { replace: true });
+  state.rowId = rowId;
+  state.hour = hour;
+  state.entryPanelOpen = true;
+  window.history.pushState(
+    { chartDetailOpen: true, entryPanelOpen: true },
+    "",
+    chartPointHash(patientId, rowId, hour)
+  );
+  save();
+  render();
+}
+
+function ensureEntryPanelHistory(route) {
+  if (window.history.state?.entryPanelOpen) return;
+  window.history.replaceState({ chartDetailOpen: true }, "", chartHash(route.patientId));
+  window.history.pushState(
+    { chartDetailOpen: true, entryPanelOpen: true },
+    "",
+    chartPointHash(route.patientId, route.rowId, route.hour)
+  );
+}
+
 function clearLongPressTimer() {
   clearTimeout(longPressTimer);
   longPressTimer = null;
+}
+
+function startMeasureHold(target, pointerId, startX, startY) {
+  if (!measureModeForRow(target.dataset.measureRow)) return;
+  clearLongPressTimer();
+  measureHold = { target, pointerId, startX, startY, moved: false };
+  longPressTimer = setTimeout(() => {
+    if (!measureHold || measureHold.pointerId !== pointerId || measureHold.moved) return;
+    const nextTarget = measureHold.target;
+    measureHold = null;
+    longPressTimer = null;
+    cellTap = null;
+    openMeasureFromChart(nextTarget);
+  }, 520);
+}
+
+function moveMeasureHold(pointerId, clientX, clientY) {
+  if (!measureHold || measureHold.pointerId !== pointerId) return;
+  if (Math.hypot(clientX - measureHold.startX, clientY - measureHold.startY) <= 8) return;
+  measureHold.moved = true;
+  clearLongPressTimer();
+}
+
+function cancelMeasureHold(pointerId) {
+  if (!measureHold || measureHold.pointerId !== pointerId) return;
+  measureHold = null;
+  clearLongPressTimer();
 }
 
 function openMeasureFromChart(target) {
@@ -3466,7 +3861,33 @@ function openMeasureFromChart(target) {
   };
   state.section = "quick";
   state.quickOpen = false;
+  state.entryPanelOpen = false;
   suppressClickUntil = Date.now() + 700;
+  save();
+  render();
+}
+
+function returnToChartPoint(target = {}) {
+  const returnTarget = state.bpmReturn || {};
+  const patientId = target.dataset?.patientId || returnTarget.patientId || state.patientId;
+  const rowId = target.dataset?.rowId || returnTarget.rowId || state.rowId || (state.bpmMode === "resp" ? "resp" : "pulse");
+  const patient = patientById(patientId) || activePatient();
+  const hour = Number(target.dataset?.hour ?? returnTarget.hour ?? state.hour ?? currentTimeSlot(chartIntervalForPatient(patient)));
+  const dateKey = target.dataset?.dateKey || returnTarget.dateKey || selectedDateKey();
+  state.patientId = patientId;
+  state.rowId = rowId;
+  state.hour = hour;
+  state.chartDate = normalizeDateKey(dateKey);
+  state.section = "chart";
+  state.view = "chart";
+  state.chartDetailOpen = true;
+  state.quickOpen = false;
+  state.entryPanelOpen = false;
+  state.chartFocus = { patientId, rowId, hour, dateKey: state.chartDate };
+  const nextHash = chartHash(patientId);
+  if (window.location.hash !== nextHash) {
+    window.history.replaceState({ chartDetailOpen: true }, "", nextHash);
+  }
   save();
   render();
 }
@@ -3713,7 +4134,9 @@ function finishChartResize(event) {
 
 function finishChartPan(event) {
   if (chartPan && event.pointerId === chartPan.pointerId) {
-    if (chartPan.moved) suppressClickUntil = Date.now() + 180;
+    if (chartPan.moved) {
+      suppressClickUntil = Date.now() + 180;
+    }
     syncChartScrollTrack(chartPan.chart);
     chartPan = null;
   }
@@ -3722,7 +4145,30 @@ function finishChartPan(event) {
     syncChartScrollTrack(chartTrackDrag.chart);
     chartTrackDrag = null;
   }
+}
+
+function finishCellTap(event) {
+  if (!cellTap || event.pointerId !== cellTap.pointerId) return;
+  const target = cellTap.target;
+  const moved = cellTap.moved;
+  cellTap = null;
   clearLongPressTimer();
+  if (moved) return;
+  if (!target) return;
+  event.preventDefault();
+  openEntryFromCell(target);
+  suppressClickUntil = Date.now() + 250;
+}
+
+function cancelCellTap(event) {
+  if (cellTap && event.pointerId === cellTap.pointerId) {
+    cellTap = null;
+    clearLongPressTimer();
+  }
+  if (measureHold && measureHold.pointerId === event.pointerId) {
+    measureHold = null;
+    clearLongPressTimer();
+  }
 }
 
 function syncChartScrollTrack(chart) {
@@ -3743,7 +4189,35 @@ function syncChartScrollTracks() {
 
 function focusCurrentChartSlot() {
   if (!state.authed || !state.chartDetailOpen || state.entryPanelOpen) return;
+  const route = chartRouteFromHash();
+  const focusTarget =
+    state.chartFocus ||
+    (route?.rowId && Number.isFinite(route.hour)
+      ? { patientId: route.patientId, rowId: route.rowId, hour: route.hour, dateKey: selectedDateKey() }
+      : null);
   document.querySelectorAll(".chart-wrap").forEach((chart) => {
+    if (focusTarget) {
+      const targetCell = chart.querySelector(
+        `[data-action='select-cell'][data-patient-id="${focusTarget.patientId}"][data-row-id="${focusTarget.rowId}"][data-hour="${focusTarget.hour}"]`
+      );
+      if (!targetCell) return;
+      const rowHeader = targetCell.closest("tr")?.querySelector(".row-label");
+      const targetColumn = targetCell.closest("td") || targetCell;
+      const targetLeft = targetColumn.offsetLeft - chart.clientWidth * 0.56;
+      chart.scrollLeft = Math.max(0, targetLeft);
+      const targetRect = (rowHeader || targetCell).getBoundingClientRect();
+      window.scrollTo({
+        top: Math.max(0, window.scrollY + targetRect.top - window.innerHeight * 0.48),
+        left: 0,
+        behavior: "auto"
+      });
+      syncChartScrollTrack(chart);
+      if (state.chartFocus) {
+        delete state.chartFocus;
+        save();
+      }
+      return;
+    }
     if (chart.dataset.focusedDate === selectedDateKey()) return;
     const currentCell = chart.querySelector("th.now, td.now");
     if (!currentCell) return;

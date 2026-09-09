@@ -6,7 +6,7 @@
     "hour": 1,
     "value": "5.5kg",
     "staff": "데모수의사A",
-    "dateKey": "2026-09-09",
+    "dateKey": "2026-09-10",
     "writtenAt": "2026-09-03T23:10:35.774Z"
   },
   {
@@ -16,7 +16,7 @@
     "hour": 3,
     "value": "140",
     "staff": "데모수의사A",
-    "dateKey": "2026-09-09",
+    "dateKey": "2026-09-10",
     "writtenAt": "2026-09-03T23:10:35.774Z"
   },
   {
@@ -26,7 +26,7 @@
     "hour": 3,
     "value": "24",
     "staff": "데모수의사A",
-    "dateKey": "2026-09-09",
+    "dateKey": "2026-09-10",
     "writtenAt": "2026-09-03T23:10:35.774Z"
   },
   {
@@ -36,7 +36,7 @@
     "hour": 1,
     "value": "정상",
     "staff": "데모수의사A",
-    "dateKey": "2026-09-09",
+    "dateKey": "2026-09-10",
     "writtenAt": "2026-09-03T23:10:35.774Z"
   },
   {
@@ -46,7 +46,7 @@
     "hour": 1,
     "value": "정상뇨",
     "staff": "데모수의사A",
-    "dateKey": "2026-09-09",
+    "dateKey": "2026-09-10",
     "writtenAt": "2026-09-03T23:10:35.774Z"
   },
   {
@@ -56,7 +56,7 @@
     "hour": 5,
     "value": "✓",
     "staff": "데모수의사A",
-    "dateKey": "2026-09-09",
+    "dateKey": "2026-09-10",
     "writtenAt": "2026-09-03T23:10:35.774Z"
   },
   {
@@ -66,27 +66,7 @@
     "hour": 1,
     "value": "✓",
     "staff": "데모수의사A",
-    "dateKey": "2026-09-09",
-    "writtenAt": "2026-09-03T23:10:35.774Z"
-  },
-  {
-    "id": "p7770_twitching_1",
-    "patientId": "p7770",
-    "rowId": "twitching",
-    "hour": 1,
-    "value": "N",
-    "staff": "데모수의사A",
-    "dateKey": "2026-09-09",
-    "writtenAt": "2026-09-03T23:10:35.774Z"
-  },
-  {
-    "id": "p7770_twitching_3",
-    "patientId": "p7770",
-    "rowId": "twitching",
-    "hour": 3,
-    "value": "N",
-    "staff": "데모수의사A",
-    "dateKey": "2026-09-09",
+    "dateKey": "2026-09-10",
     "writtenAt": "2026-09-03T23:10:35.774Z"
   },
   {
@@ -96,7 +76,7 @@
     "hour": 3,
     "value": "130",
     "staff": "데모수의사B",
-    "dateKey": "2026-09-09",
+    "dateKey": "2026-09-10",
     "writtenAt": "2026-09-03T23:10:35.774Z"
   },
   {
@@ -106,7 +86,7 @@
     "hour": 3,
     "value": "24",
     "staff": "데모수의사B",
-    "dateKey": "2026-09-09",
+    "dateKey": "2026-09-10",
     "writtenAt": "2026-09-03T23:10:35.774Z"
   },
   {
@@ -116,7 +96,7 @@
     "hour": 3,
     "value": "정상",
     "staff": "데모수의사B",
-    "dateKey": "2026-09-09",
+    "dateKey": "2026-09-10",
     "writtenAt": "2026-09-03T23:10:35.774Z"
   },
   {
@@ -126,7 +106,7 @@
     "hour": 5,
     "value": "1",
     "staff": "데모수의사B",
-    "dateKey": "2026-09-09",
+    "dateKey": "2026-09-10",
     "writtenAt": "2026-09-03T23:10:35.774Z"
   },
   {
@@ -136,7 +116,7 @@
     "hour": 3,
     "value": "✓",
     "staff": "데모수의사B",
-    "dateKey": "2026-09-09",
+    "dateKey": "2026-09-10",
     "writtenAt": "2026-09-03T23:10:35.774Z"
   },
   {
@@ -146,17 +126,7 @@
     "hour": 3,
     "value": "✓",
     "staff": "데모수의사B",
-    "dateKey": "2026-09-09",
-    "writtenAt": "2026-09-03T23:10:35.774Z"
-  },
-  {
-    "id": "p2161_twitching_3",
-    "patientId": "p2161",
-    "rowId": "twitching",
-    "hour": 3,
-    "value": "N",
-    "staff": "데모수의사B",
-    "dateKey": "2026-09-09",
+    "dateKey": "2026-09-10",
     "writtenAt": "2026-09-03T23:10:35.774Z"
   },
   {
@@ -178,5 +148,47 @@
     "staff": "데모수의사C",
     "dateKey": "2026-09-03",
     "writtenAt": "2026-09-08T08:44:35.785Z"
+  },
+  {
+    "id": "p5947_vomit_20_sample",
+    "patientId": "p5947",
+    "rowId": "vomit",
+    "hour": 20,
+    "value": "구토 1회",
+    "staff": "데모수의사C",
+    "dateKey": "2026-09-10",
+    "writtenAt": "2026-09-03T23:10:35.774Z",
+    "photoAsset": "assets/vomit-sample.jpeg"
+  },
+  {
+    "id": "e_1788968911981",
+    "patientId": "p5947",
+    "rowId": "vomit",
+    "hour": 0,
+    "value": "사료토",
+    "staff": "데모수의사C",
+    "dateKey": "2026-09-10",
+    "writtenAt": "2026-09-09T15:48:31.981Z",
+    "photoAsset": "assets/vomit-sample.jpeg"
+  },
+  {
+    "id": "e_1788969142100",
+    "patientId": "p5947",
+    "rowId": "bp",
+    "hour": 0,
+    "value": "160",
+    "staff": "데모수의사C",
+    "dateKey": "2026-09-10",
+    "writtenAt": "2026-09-09T15:52:22.100Z"
+  },
+  {
+    "id": "e_1788969200238",
+    "patientId": "p5947",
+    "rowId": "bp",
+    "hour": 1,
+    "value": "140",
+    "staff": "데모수의사C",
+    "dateKey": "2026-09-10",
+    "writtenAt": "2026-09-09T15:53:20.238Z"
   }
 ]

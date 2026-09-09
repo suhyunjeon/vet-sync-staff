@@ -217,7 +217,7 @@ function refreshSeedEntryDates(entryList) {
 
 function isSeedDemoEntry(entry) {
   return (
-    entry?.dateKey === "2026-09-03" &&
+    ["2026-09-03", "2026-09-09"].includes(entry?.dateKey) &&
     ["p7770", "p2161", "p5947"].includes(entry.patientId) &&
     typeof entry.id === "string" &&
     !entry.id.startsWith("e_")
