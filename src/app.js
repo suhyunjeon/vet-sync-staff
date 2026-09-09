@@ -585,8 +585,7 @@ document.addEventListener("click", (event) => {
   }
 
   if (action.dataset.action === "set-bpm-mode") {
-    state.bpmMode = action.dataset.value;
-    resetBpmMeasure();
+    setBpmMode(action.dataset.value);
     save();
     render();
     return;
@@ -603,7 +602,7 @@ document.addEventListener("click", (event) => {
   }
 
   if (action.dataset.action === "reset-bpm") {
-    resetBpmMeasure();
+    state.bpmMeasure = null;
     save();
     render();
     return;
@@ -2914,70 +2913,56 @@ function renderQuickScreen(patient) {
   const measure = currentBpmMeasure();
   const modeLabel = state.bpmMode === "resp" ? "호흡수" : "심박수";
   const modeUnit = state.bpmMode === "resp" ? "RPM" : "BPM";
-  const row = rows.find((item) => item.id === state.rowId) || rows[0];
-  const showKeypad = shouldShowKeypad(row.id);
-  const targetHour = Number(state.bpmReturn?.hour ?? state.hour ?? currentTimeSlot(chartIntervalForPatient(patient)));
+  const progressDeg = Math.round(measure.progress * 3.6);
   return `
-    <section class="quick-page menu-screen">
-      <div class="quick-clock">
-        <strong>${periodLabel(currentHour)} ${hour12(currentHour)}</strong>
+    <section class="quick-page menu-screen measure-only">
+      <div class="quick-clock bpm-topbar">
+        <div>
+          <span>Measure</span>
+          <strong>${modeLabel} 측정</strong>
+        </div>
         <div class="quick-clock-actions">
-          <a class="bpm-chart-link" href="${chartPointHash(patient.id, row.id, targetHour)}">차트로</a>
+          <a class="bpm-chart-link" href="${chartHash(patient.id)}">차트로</a>
           <button class="plain-icon" data-action="open-notifications" aria-label="알림">♢</button>
         </div>
       </div>
       <div class="bpm-card">
-        <div class="bpm-tabs">
-          <button class="${state.bpmMode !== "resp" ? "active" : ""}" data-action="set-bpm-mode" data-value="pulse">심박수</button>
-          <button class="${state.bpmMode === "resp" ? "active" : ""}" data-action="set-bpm-mode" data-value="resp">호흡수</button>
-          <button data-action="reset-bpm">초기화</button>
+        <div class="bpm-card-head">
+          <div>
+            <span>${state.bpmReturn ? "차트 자동 입력" : "수동 측정"}</span>
+            <strong>${state.bpmReturn ? `#${patient.chartNo} ${patient.name}` : `${modeLabel} 기록`}</strong>
+            <small>${state.bpmReturn ? `${formatTimeLabel(state.bpmReturn.hour)} · 측정 완료 시 자동 저장` : "측정 후 저장 버튼으로 차트에 기록"}</small>
+          </div>
+          <button type="button" data-action="reset-bpm">초기화</button>
         </div>
-        ${state.bpmReturn ? `<div class="bpm-target">#${patient.chartNo} ${patient.name} · ${modeLabel} · ${formatTimeLabel(state.bpmReturn.hour)} 자동입력</div>` : ""}
-        <button class="bpm-pad ${measure.active ? "measuring" : ""} ${measure.result !== null ? "done" : ""}" type="button" data-action="tap-bpm">
+        <div class="bpm-tabs">
+          <button type="button" class="${state.bpmMode !== "resp" ? "active" : ""}" data-action="set-bpm-mode" data-value="pulse">심박수</button>
+          <button type="button" class="${state.bpmMode === "resp" ? "active" : ""}" data-action="set-bpm-mode" data-value="resp">호흡수</button>
+        </div>
+        <button class="bpm-pad ${measure.active ? "measuring" : ""} ${measure.result !== null ? "done" : ""}" type="button" data-action="tap-bpm" style="--progress-deg: ${progressDeg}deg">
+          <span class="bpm-ring" aria-hidden="true"></span>
           <strong>${measure.result !== null ? `${measure.result}` : modeUnit}</strong>
           <span>${bpmPadLabel(measure, modeLabel)}</span>
         </button>
-        <div class="bpm-meter">
+        <div class="bpm-meter" aria-hidden="true">
           <span style="--progress: ${measure.progress}%"></span>
         </div>
-        <div class="bpm-readout">
-          <p>${measure.active ? `${measure.remaining}초 남음` : measure.result !== null ? `10초 ${measure.taps}회 → 1분 ${measure.result}${modeUnit}` : "측정 준비"}</p>
-          <p>탭 ${measure.taps}회</p>
+        <div class="bpm-readout" aria-label="측정 상태">
+          <div>
+            <span>상태</span>
+            <strong>${bpmStatusLabel(measure)}</strong>
+          </div>
+          <div>
+            <span>남은 시간</span>
+            <strong>${measure.result !== null ? "완료" : `${measure.remaining}초`}</strong>
+          </div>
+          <div>
+            <span>탭</span>
+            <strong>${measure.taps}회</strong>
+          </div>
         </div>
         ${measure.result !== null && !state.bpmReturn ? `<button class="bpm-save" data-action="save-bpm-result">${modeLabel} 차트에 저장</button>` : ""}
       </div>
-      <form class="quick-entry-card" data-form="entry">
-        <input type="hidden" name="patientId" value="${patient.id}" />
-        <input type="hidden" name="rowId" value="${row.id}" />
-        <input type="hidden" name="hour" value="${currentTimeSlot(chartIntervalForPatient(patient))}" />
-        <div class="quick-search">
-          <span>▣</span>
-          ${clearableControl(`<textarea name="value" placeholder="결과/완료/메모 입력" autocomplete="off" ${row.id === "vomit" ? "" : "required"}></textarea>`)}
-        </div>
-        ${row.id === "vomit" ? renderVomitPhotoInputs() : ""}
-        ${state.entrySaveNotice ? `<p class="entry-save-notice">${state.entrySaveNotice}</p>` : ""}
-        <div class="quick-entry-layout">
-          <div class="quick-row-picker">
-            ${rows
-              .filter((item) => item.quick)
-              .map(
-                (item, index) => `
-                  <button type="button" class="${item.id === row.id ? "active" : ""}" data-action="select-quick-row" data-row-id="${item.id}">
-                    ${index + 1}. ${item.label}
-                  </button>
-                `
-              )
-              .join("")}
-          </div>
-          ${showKeypad ? renderQuickKeypad() : `<button class="quick-save-wide" type="submit">기록 저장</button>`}
-        </div>
-      </form>
-      ${row.id === "vomit" ? renderVomitPhotoGallery(patient.id) : ""}
-      <label class="patient-search">
-        <input name="search" value="${state.search || ""}" placeholder="환자 선택 / 차트 번호 입력" autocomplete="off" />
-        <span>⌕</span>
-      </label>
-      <div class="quick-patient-strip">${filteredPatients().map(renderMiniPatientButton).join("")}</div>
     </section>
   `;
 }
@@ -3963,6 +3948,25 @@ function bpmPadLabel(measure, modeLabel) {
   if (measure.active) return `${modeLabel}에 맞춰 계속 탭`;
   if (measure.result !== null) return "다시 측정하려면 탭";
   return "탭해서 10초 측정 시작";
+}
+
+function bpmStatusLabel(measure) {
+  if (measure.active) return "측정 중";
+  if (measure.result !== null) return `${measure.result}`;
+  return "준비";
+}
+
+function setBpmMode(mode) {
+  const nextMode = mode === "resp" ? "resp" : "pulse";
+  state.bpmMode = nextMode;
+  state.rowId = nextMode === "resp" ? "resp" : "pulse";
+  state.bpmMeasure = null;
+  if (state.bpmReturn) {
+    state.bpmReturn = {
+      ...state.bpmReturn,
+      rowId: state.rowId
+    };
+  }
 }
 
 function syncBpmTicker() {
