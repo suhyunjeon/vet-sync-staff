@@ -2072,7 +2072,6 @@ function renderChartCopyTools(patient) {
 function renderShiftSummary(patient) {
   const vitals = latestVitalSummary(patient.id);
   const doneCount = entriesFor(patient.id).length;
-  const row = rows.find((item) => item.id === state.rowId) || rows[0];
   return `
     <section class="shift-summary" aria-label="선택 환자 요약">
       <div>
@@ -2086,10 +2085,6 @@ function renderShiftSummary(patient) {
       <div>
         <span>오늘 기록</span>
         <strong>${doneCount}건</strong>
-      </div>
-      <div>
-        <span>선택 칸</span>
-        <strong>${row.label} · ${state.hour}시</strong>
       </div>
     </section>
   `;
